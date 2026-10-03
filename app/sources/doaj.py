@@ -9,6 +9,31 @@ from app.core.http import limited_get
 from app.core.utils import parse_iso, utc_iso
 from app.sources.base import PaperItem, SourceBase
 
+_MONTHS = {
+    m: i
+    for i, m in enumerate(
+        [
+            "january", "february", "march", "april", "may", "june",
+            "july", "august", "september", "october", "november", "december",
+        ],
+        1,
+    )
+}
+_MONTHS.update({m[:3]: i for m, i in list(_MONTHS.items())})
+
+
+def _month_number(raw: object) -> int | None:
+    """把 DOAJ 的 month 字段规整成 1–12。无法识别时返回 None（退化为 1 月 1 日）。"""
+    if raw is None:
+        return None
+    if isinstance(raw, int):
+        return raw if 1 <= raw <= 12 else None
+    text = str(raw).strip().lower()
+    if text.isdigit():
+        value = int(text)
+        return value if 1 <= value <= 12 else None
+    return _MONTHS.get(text) or _MONTHS.get(text[:3])
+
 
 class DoajSource(SourceBase):
     def fetch(self, start_date: str, end_date: str, params: dict) -> Iterator[PaperItem]:
@@ -37,9 +62,11 @@ class DoajSource(SourceBase):
                 doi = ident.get("id", "")
         authors = [a.get("name", "") for a in bib.get("author", [])]
         journal = bib.get("journal") or {}
-        published = bib.get("year", "")
-        month = bib.get("month")
-        when = f"{published}-{int(month):02d}-01" if month else f"{published}-01-01"
+        published = str(bib.get("year") or "").strip()
+        # DOAJ 的 month 可能是 "10" 也可能是 "October"，或缺失/非法
+        month = _month_number(bib.get("month"))
+        year = published if published.isdigit() else "1970"
+        when = f"{year}-{month:02d}-01" if month else f"{year}-01-01"
         return PaperItem(
             source_key=self.key,
             source_id=doi or (bib.get("title", "")[:120]),

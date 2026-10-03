@@ -137,3 +137,41 @@ def test_arxiv_query_construction():
     q = src._search_query("2026-10-01", "2026-10-03", {})
     assert "cat:cs.AI" in q and "cat:cs.CV" in q
     assert "submittedDate:[202610010000+TO+202610032359]" in q
+
+
+def test_doaj_month_normalization():
+    """回归：DOAJ 的 month 字段可能是 '10' 也可能是 'October'，
+    原实现直接 int(month) 导致整条采集任务崩溃。"""
+    from app.sources.doaj import _month_number
+
+    assert _month_number(10) == 10
+    assert _month_number("10") == 10
+    assert _month_number("October") == 10
+    assert _month_number("oct") == 10
+    assert _month_number("DECEMBER") == 12
+    assert _month_number(None) is None
+    assert _month_number("") is None
+    assert _month_number(13) is None
+    assert _month_number("garbage") is None
+
+
+def test_doaj_item_with_month_name():
+    from app.sources.doaj import DoajSource
+
+    src = DoajSource({"key": "doaj"})
+    item = src._to_item(
+        {
+            "bibjson": {
+                "title": "A DOAJ Article",
+                "year": "2026",
+                "month": "October",
+                "abstract": "x" * 250,
+                "author": [{"name": "Test"}],
+                "identifier": [{"type": "doi", "id": "10.1234/abc"}],
+                "journal": {"title": "J"},
+                "link": [{"url": "https://example.com"}],
+            }
+        }
+    )
+    assert item.title == "A DOAJ Article"
+    assert item.published_at.startswith("2026-10-01")
