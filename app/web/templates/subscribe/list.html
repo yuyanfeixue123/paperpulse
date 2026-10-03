@@ -1,0 +1,34 @@
+{% extends "layouts/base.html" %}
+{% block title %}我的订阅{% endblock %}
+{% block content %}
+<div class="row" style="margin-bottom:16px">
+  <h1 style="margin:0">我的订阅</h1>
+  <div class="spacer"></div>
+  <a class="btn" href="/interests/new">新建订阅</a>
+</div>
+
+{% if not interests %}
+  <div class="card">
+    <p class="muted">还没有订阅。用一句话描述你的研究方向，系统会生成结构化画像。</p>
+    <a class="btn" href="/interests/new">新建订阅</a>
+  </div>
+{% endif %}
+
+{% for it in interests %}
+<div class="card">
+  <div class="row">
+    <h2 style="margin:0">{{ it.name }}</h2>
+    <span class="badge {% if it.is_active %}ok{% else %}warn{% endif %}">
+      {{ '启用' if it.is_active else '暂停' }}
+    </span>
+    <div class="spacer"></div>
+    <a class="btn secondary small" href="/interests/{{ it.id }}">详情</a>
+  </div>
+  <p class="muted small">{{ it.description[:160] }}</p>
+  <p class="small muted">
+    每日 {{ it.max_papers_per_day }} 篇 · 阈值 {{ it.min_score }} ·
+    推送 {{ it.send_at }}（{{ it.timezone }}）· 版本 v{{ it.version }}
+  </p>
+</div>
+{% endfor %}
+{% endblock %}

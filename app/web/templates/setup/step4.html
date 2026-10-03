@@ -1,0 +1,68 @@
+{% extends "layouts/base.html" %}
+{% block title %}首次部署 · 第 4 步{% endblock %}
+{% block content %}
+<div class="container narrow">
+  <div class="steps">
+    {% for i in range(1, total + 1) %}
+      <span class="step {% if i == step %}active{% elif i < step %}done{% endif %}">{{ i }} {{ titles[i] }}</span>
+    {% endfor %}
+  </div>
+  <div class="card">
+    <h1>4 · 邮件通道（必配）</h1>
+    <div class="notice">无可用邮件通道将无法发送验证邮件与每日推送，此步不可跳过。</div>
+    <form method="post" action="/admin/setup/4">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field">
+        <label>通道类型</label>
+        <select name="kind" id="kind">
+          {% for k, v in presets.items() %}
+            <option value="{{ k }}">{{ k }} — {{ v.note }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>发信地址</label>
+        <input type="email" name="from_email" placeholder="papers@yourdomain.com" required>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>API Key（brevo / resend）</label>
+          <input type="password" name="api_key">
+        </div>
+        <div class="field">
+          <label>日额度</label>
+          <input type="number" name="daily_budget" value="250">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>SMTP 用户名（ses / smtp）</label>
+          <input type="text" name="username">
+        </div>
+        <div class="field">
+          <label>SMTP 密码</label>
+          <input type="password" name="password">
+        </div>
+      </div>
+      <div class="grid3">
+        <div class="field">
+          <label>SMTP 主机（选填，覆盖预设）</label>
+          <input type="text" name="host">
+        </div>
+        <div class="field">
+          <label>端口</label>
+          <input type="text" name="port" value="587">
+        </div>
+        <div class="field">
+          <label>AWS 区域（ses）</label>
+          <input type="text" name="region" value="us-east-1">
+        </div>
+      </div>
+      <button type="submit">下一步</button>
+    </form>
+    <p class="small muted" style="margin-top:12px">
+      下一步之后可在「后台 → 邮件」发送测试邮件验证配置。
+    </p>
+  </div>
+</div>
+{% endblock %}

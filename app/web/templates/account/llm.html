@@ -1,0 +1,85 @@
+{% extends "layouts/base.html" %}
+{% block title %}配置 API Key{% endblock %}
+{% block content %}
+<div class="container narrow">
+  {% if ready and not reason_text %}
+    <div class="card">
+      <h1>API Key 已配置</h1>
+      <p class="muted">你可以开始创建订阅了。</p>
+      <a class="btn" href="{{ next_url }}">新建订阅</a>
+      <a class="btn secondary" href="/interests">我的订阅</a>
+    </div>
+  {% else %}
+    <div class="card">
+      <h1>配置你的 LLM API Key</h1>
+      <p class="muted">{{ reason_text or '创建订阅需要 AI 解析与论文精排，请先配置一个 LLM API Key。' }}</p>
+
+      {% if global_ready %}
+        <div class="notice">
+          管理员已为本站配置全局凭据，你其实<strong>不必自备 Key</strong>。
+          若想继续停留在本页，可直接使用系统凭据。
+        </div>
+        <form method="post" action="/account/llm">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="action" value="skip">
+          <input type="hidden" name="next" value="{{ next_url }}">
+          <button class="btn secondary" type="submit">使用系统凭据，继续</button>
+        </form>
+        <p class="small muted" style="margin:16px 0 8px">— 或者填入你自己的 Key（推荐 DeepSeek / 通义 / 智谱等，费用更低）—</p>
+      {% else %}
+        <div class="notice">
+          本站管理员尚未配置全局凭据，因此每位用户需自带一个 API Key。
+          Key 以 Fernet 加密存储，仅用于你的订阅解析与打分。
+        </div>
+      {% endif %}
+
+      <form method="post" action="/account/llm">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="action" value="save">
+        <input type="hidden" name="next" value="{{ next_url }}">
+
+        <div class="field">
+          <label>厂商</label>
+          <select name="provider" onchange="applyPreset(this.value)">
+            {% for name, p in presets.items() %}
+              <option value="{{ p.provider }}" data-url="{{ p.base_url }}"
+                      data-model="{{ p.models[0] if p.models else '' }}">
+                {{ name }} — {{ p.base_url }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Base URL</label>
+          <input type="url" name="base_url" id="base_url" required
+                 placeholder="https://api.deepseek.com/v1">
+        </div>
+        <div class="field">
+          <label>API Key</label>
+          <input type="password" name="api_key" required placeholder="sk-...">
+        </div>
+        <div class="field">
+          <label>模型</label>
+          <input type="text" name="model" id="model" placeholder="deepseek-chat">
+          <p class="small muted">留空则用该厂商的默认模型</p>
+        </div>
+        <button type="submit">保存并测试连接</button>
+        <a class="btn secondary" href="/interests">稍后再说</a>
+      </form>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+function applyPreset(provider) {
+  const sel = document.querySelector('select[name=provider]');
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('base_url').value = opt.dataset.url || '';
+  document.getElementById('model').value = opt.dataset.model || '';
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.querySelector('select[name=provider]');
+  if (sel && !document.getElementById('base_url').value) applyPreset(sel.value);
+});
+</script>
+{% endblock %}

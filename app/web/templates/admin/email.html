@@ -1,0 +1,109 @@
+{% extends "layouts/base.html" %}
+{% block title %}邮件通道{% endblock %}
+{% block content %}
+<h1>邮件通道</h1>
+
+<div class="grid3">
+  <div class="card stat"><div class="v">{{ pending }}</div><div class="k">待发</div></div>
+  <div class="card stat"><div class="v">{{ deferred }}</div><div class="k">顺延</div></div>
+  <div class="card stat"><div class="v">{{ failed }}</div><div class="k">失败</div></div>
+</div>
+
+<div class="card">
+  <h2>今日配额（{{ quota.date }}）</h2>
+  <table>
+    <tr><th>通道</th><th>角色</th><th>日额度</th><th>已发</th><th>剩余</th><th>顺延</th><th>状态</th></tr>
+    {% for p in quota.providers %}
+      {% set q = quota.quota.get(p.key, {'sent': 0, 'deferred': 0}) %}
+      <tr>
+        <td>{{ p.key }}<br><span class="small muted">{{ p.kind }}</span></td>
+        <td><span class="badge {% if p.role == 'primary' %}ok{% endif %}">{{ p.role }}</span></td>
+        <td>{{ p.budget }}</td>
+        <td>{{ q.sent }}</td>
+        <td>{{ p.budget - q.sent }}</td>
+        <td>{{ q.deferred }}</td>
+        <td><span class="badge {% if p.enabled %}ok{% else %}warn{% endif %}">{{ '启用' if p.enabled else '停用' }}</span></td>
+      </tr>
+    {% endfor %}
+  </table>
+  <div class="row" style="margin-top:12px">
+    <form method="post" action="/admin/email/flush">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn secondary small" type="submit">立即重投待发/到期顺延</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <h2>测试发信</h2>
+  <form method="post" action="/admin/email/test" class="row">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="email" name="to_email" placeholder="you@example.com" style="width:260px" required>
+    <button class="btn small" type="submit">发送测试邮件</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>配置主/备通道</h2>
+  {% for p in providers %}
+    <form method="post" action="/admin/email/save" style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="key" value="{{ p.key }}">
+      <div class="grid3">
+        <div class="field">
+          <label>通道 Key</label>
+          <input type="text" value="{{ p.key }}" disabled>
+        </div>
+        <div class="field">
+          <label>类型</label>
+          <select name="kind">
+            {% for k, v in presets.items() %}
+              <option value="{{ k }}" {% if k == p.kind %}selected{% endif %}>{{ k }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>角色</label>
+          <select name="role">
+            <option value="primary" {% if p.role == 'primary' %}selected{% endif %}>主通道</option>
+            <option value="backup" {% if p.role == 'backup' %}selected{% endif %}>备用</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid3">
+        <div class="field"><label>发信地址</label>
+          <input type="email" name="from_email" placeholder="papers@yourdomain.com"></div>
+        <div class="field"><label>API Key</label><input type="password" name="api_key" placeholder="留空表示不修改"></div>
+        <div class="field"><label>SMTP 用户名</label><input type="text" name="username"></div>
+        <div class="field"><label>SMTP 密码</label><input type="password" name="password"></div>
+        <div class="field"><label>主机</label><input type="text" name="host"></div>
+        <div class="field"><label>端口</label><input type="text" name="port" value="587"></div>
+        <div class="field"><label>AWS 区域</label><input type="text" name="region" value="us-east-1"></div>
+        <div class="field"><label>日额度</label><input type="number" name="daily_budget" value="{{ p.daily_budget }}"></div>
+        <div class="field"><label>优先级</label><input type="number" name="priority" value="{{ p.priority }}"></div>
+      </div>
+      <label class="small"><input type="checkbox" name="enabled" value="1" {% if p.enabled %}checked{% endif %}> 启用该通道</label>
+      <br><br>
+      <button class="btn small" type="submit">保存</button>
+    </form>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>最近投递</h2>
+  <table>
+    <tr><th>ID</th><th>摘要</th><th>收件人</th><th>状态</th><th>通道</th><th>重试</th><th>错误</th></tr>
+    {% for d in recent %}
+    <tr>
+      <td>{{ d.id }}</td>
+      <td>{{ d.digest_id }}</td>
+      <td class="small">{{ d.to_email }}</td>
+      <td><span class="badge {% if d.status == 'sent' %}ok{% elif d.status == 'failed' %}err{% else %}warn{% endif %}">{{ d.status }}</span></td>
+      <td class="small muted">{{ d.provider_key }}</td>
+      <td>{{ d.attempts }}</td>
+      <td class="small muted">{{ d.last_error[:60] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

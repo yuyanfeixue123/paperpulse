@@ -1,0 +1,68 @@
+{% extends "layouts/base.html" %}
+{% block title %}存储生命周期{% endblock %}
+{% block content %}
+<h1>存储生命周期</h1>
+
+<div class="grid3">
+  <div class="card stat"><div class="v">{{ est.pool_rows }}</div><div class="k">论文池总条数</div></div>
+  <div class="card stat"><div class="v">{{ est.pool_mb }}</div><div class="k">估算占用 (MB)</div></div>
+  <div class="card stat"><div class="v">{{ disk_pct }}%</div><div class="k">磁盘占用</div></div>
+  <div class="card stat"><div class="v">{{ est.oldest[:10] }}</div><div class="k">最早论文日期</div></div>
+  <div class="card stat"><div class="v">{{ purge_hour }}:00</div><div class="k">每日清理时刻</div></div>
+  <div class="card stat"><div class="v">{{ est.rows }}</div><div class="k">当前条件可清理</div></div>
+</div>
+
+<div class="card">
+  <h2>清理设置</h2>
+  <form method="post" action="/admin/storage/save">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid2">
+      <div class="field">
+        <label>保留天数</label>
+        <input type="number" name="retention_days" min="1" max="365" value="{{ days }}">
+      </div>
+      <div class="field">
+        <label>清理范围</label>
+        <select name="purge_scope">
+          <option value="all" {% if scope == 'all' %}selected{% endif %}>全部超期清理</option>
+          <option value="unsent_only" {% if scope == 'unsent_only' %}selected{% endif %}>仅清理从未推送过的</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>清理时刻（小时）</label>
+        <input type="number" name="purge_hour" min="0" max="23" value="{{ purge_hour }}">
+      </div>
+      <div class="field">
+        <label>论文池行数硬上限</label>
+        <input type="number" name="max_pool_rows" min="1000" value="{{ max_rows }}">
+      </div>
+    </div>
+    <button type="submit">保存</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>清理操作</h2>
+  <p class="small muted">
+    当前条件：保留 {{ days }} 天、范围 {{ scope }} → 可清理 <b>{{ est.rows }}</b> 条，约 <b>{{ est.estimated_mb }}</b> MB。
+  </p>
+  <div class="row">
+    <form method="post" action="/admin/storage/estimate">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn secondary small" type="submit">预估清理量</button>
+    </form>
+    <form method="post" action="/admin/storage/purge">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn small" type="submit">立即清理</button>
+    </form>
+    <form method="post" action="/admin/storage/clear" onsubmit="return confirm('将清空全部论文池，确定？')">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="text" name="confirm" placeholder="输入「清空」确认" style="width:140px">
+      <button class="btn danger small" type="submit">清空全部</button>
+    </form>
+  </div>
+  <p class="small muted" style="margin-top:10px">
+    估算公式：单条约 2.5 KB；清理分批执行（每批 1000 条），随后 VACUUM（磁盘余量不足时自动跳过）。
+  </p>
+</div>
+{% endblock %}

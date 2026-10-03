@@ -1,0 +1,460 @@
+# PaperPulse 内置数据源清单
+# 字段：key / name / type / field / url_template / params / requires_key / rate_limit / enabled
+# type 取值：arxiv | openalex | crossref | doaj | europepmc | biorxiv | osf | rss
+# 默认开启的源必须全部 requires_key: false
+# 源链接核实日期：2026-10-03
+
+sources:
+  # ---------- 综合 / 全领域 API ----------
+  - key: arxiv
+    name: arXiv（默认分类）
+    type: arxiv
+    field: cs
+    url_template: https://export.arxiv.org/api/query
+    params: { categories: [cs.AI, cs.CV, cs.LG, cs.CL] }
+    requires_key: false
+    rate_limit: { interval_seconds: 3, concurrency: 1 }
+    enabled: true
+
+  - key: arxiv_econ
+    name: arXiv 经济
+    type: arxiv
+    field: economics
+    url_template: https://export.arxiv.org/api/query
+    params: { categories: [econ.GN, econ.EM] }
+    requires_key: false
+    rate_limit: { interval_seconds: 3, concurrency: 1 }
+    enabled: false
+
+  - key: arxiv_qfin
+    name: arXiv 金融
+    type: arxiv
+    field: finance
+    url_template: https://export.arxiv.org/api/query
+    params: { categories: [q-fin.GN, q-fin.RM] }
+    requires_key: false
+    rate_limit: { interval_seconds: 3, concurrency: 1 }
+    enabled: false
+
+  - key: arxiv_stat
+    name: arXiv 统计
+    type: arxiv
+    field: statistics
+    url_template: https://export.arxiv.org/api/query
+    params: { categories: [stat.ME, stat.AP] }
+    requires_key: false
+    rate_limit: { interval_seconds: 3, concurrency: 1 }
+    enabled: false
+
+  - key: arxiv_eess
+    name: arXiv 电子与系统工程
+    type: arxiv
+    field: engineering
+    url_template: https://export.arxiv.org/api/query
+    params: { categories: [eess.SP, eess.SY] }
+    requires_key: false
+    rate_limit: { interval_seconds: 3, concurrency: 1 }
+    enabled: false
+
+  - key: arxiv_qbio
+    name: arXiv 定量生物学
+    type: arxiv
+    field: biology
+    url_template: https://export.arxiv.org/api/query
+    params: { categories: [q-bio.NC, q-bio.QM] }
+    requires_key: false
+    rate_limit: { interval_seconds: 3, concurrency: 1 }
+    enabled: false
+
+  - key: arxiv_physics
+    name: arXiv 物理
+    type: arxiv
+    field: physics
+    url_template: https://export.arxiv.org/api/query
+    params: { categories: [physics.soc-ph, physics.app-ph] }
+    requires_key: false
+    rate_limit: { interval_seconds: 3, concurrency: 1 }
+    enabled: false
+
+  - key: arxiv_math
+    name: arXiv 数学
+    type: arxiv
+    field: mathematics
+    url_template: https://export.arxiv.org/api/query
+    params: { categories: [math.OC, math.ST] }
+    requires_key: false
+    rate_limit: { interval_seconds: 3, concurrency: 1 }
+    enabled: false
+
+  - key: openalex
+    name: OpenAlex
+    type: openalex
+    field: multidisciplinary
+    url_template: https://api.openalex.org/works
+    params: { query: "" }
+    requires_key: false
+    rate_limit: { interval_seconds: 0.5, concurrency: 2 }
+    enabled: true
+
+  - key: crossref
+    name: Crossref（DOI/摘要补全）
+    type: crossref
+    field: multidisciplinary
+    url_template: https://api.crossref.org/works
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 0.5, concurrency: 2 }
+    enabled: true
+
+  - key: doaj
+    name: DOAJ 开放获取期刊
+    type: doaj
+    field: multidisciplinary
+    url_template: https://doaj.org/api/search/articles
+    params: { query: "" }
+    requires_key: false
+    rate_limit: { interval_seconds: 0.5, concurrency: 2 }
+    enabled: true
+
+  - key: europepmc
+    name: Europe PMC
+    type: europepmc
+    field: life_sciences
+    url_template: https://www.ebi.ac.uk/europepmc/webservices/rest/search
+    params: { query: "" }
+    requires_key: false
+    rate_limit: { interval_seconds: 0.5, concurrency: 2 }
+    enabled: true
+
+  - key: osf
+    name: OSF Preprints（综合）
+    type: osf
+    field: multidisciplinary
+    url_template: https://api.osf.io/v2/preprints/
+    params: { provider: osf }
+    requires_key: false
+    rate_limit: { interval_seconds: 0.5, concurrency: 2 }
+    enabled: true
+
+  - key: osf_psyarxiv
+    name: PsyArXiv（心理）
+    type: osf
+    field: psychology
+    url_template: https://api.osf.io/v2/preprints/
+    params: { provider: psyarxiv }
+    requires_key: false
+    rate_limit: { interval_seconds: 0.5, concurrency: 2 }
+    enabled: false
+
+  - key: osf_socarxiv
+    name: SocArXiv（社会）
+    type: osf
+    field: social_sciences
+    url_template: https://api.osf.io/v2/preprints/
+    params: { provider: socarxiv }
+    requires_key: false
+    rate_limit: { interval_seconds: 0.5, concurrency: 2 }
+    enabled: false
+
+  - key: osf_eartharxiv
+    name: EarthArXiv（地学）
+    type: osf
+    field: earth_science
+    url_template: https://api.osf.io/v2/preprints/
+    params: { provider: eartharxiv }
+    requires_key: false
+    rate_limit: { interval_seconds: 0.5, concurrency: 2 }
+    enabled: false
+
+  - key: osf_engrxiv
+    name: EngrXiv（工程）
+    type: osf
+    field: engineering
+    url_template: https://api.osf.io/v2/preprints/
+    params: { provider: engrxiv }
+    requires_key: false
+    rate_limit: { interval_seconds: 0.5, concurrency: 2 }
+    enabled: false
+
+  # ---------- 需 Key 的增强源（默认关闭） ----------
+  - key: zenodo
+    name: Zenodo
+    type: zenodo
+    field: multidisciplinary
+    url_template: https://zenodo.org/api/records
+    params: { query: "" }
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 1 }
+    enabled: false
+
+  - key: hal
+    name: HAL
+    type: hal
+    field: multidisciplinary
+    url_template: https://api.archives-ouvertes.fr/search/
+    params: { query: "" }
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 1 }
+    enabled: false
+
+  - key: s2
+    name: Semantic Scholar
+    type: s2
+    field: multidisciplinary
+    url_template: https://api.semanticscholar.org/graph/v1/paper/search
+    params: { query: "" }
+    requires_key: true
+    rate_limit: { interval_seconds: 1, concurrency: 1 }
+    enabled: false
+
+  - key: pubmed
+    name: PubMed
+    type: pubmed
+    field: medicine
+    url_template: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi
+    params: { query: "" }
+    requires_key: true
+    rate_limit: { interval_seconds: 0.4, concurrency: 1 }
+    enabled: false
+
+  - key: unpaywall
+    name: Unpaywall（OA 链接补全）
+    type: unpaywall
+    field: multidisciplinary
+    url_template: https://api.unpaywall.org/v2
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 1 }
+    enabled: false
+
+  # ---------- 专业领域 API ----------
+  - key: biorxiv
+    name: bioRxiv
+    type: biorxiv
+    field: life_sciences
+    url_template: https://api.biorxiv.org/details/biorxiv
+    params: { server: biorxiv }
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 1 }
+    enabled: true
+
+  - key: medrxiv
+    name: medRxiv
+    type: biorxiv
+    field: medicine
+    url_template: https://api.biorxiv.org/details/medrxiv
+    params: { server: medrxiv }
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 1 }
+    enabled: true
+
+  - key: chemrxiv
+    name: ChemRxiv
+    type: chemrxiv
+    field: chemistry
+    url_template: https://chemrxiv.org/engage/chemrxiv/public-api/v1/items
+    params: { query: "" }
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 1 }
+    enabled: false
+
+  # ---------- RSS / Atom ----------
+  - key: nber_new
+    name: NBER 工作论文
+    type: rss
+    field: economics
+    url_template: https://www.nber.org/rss/new.xml
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 1 }
+    enabled: true
+
+  - key: nature_main
+    name: Nature
+    type: rss
+    field: multidisciplinary
+    url_template: https://www.nature.com/nature.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: nature_comms
+    name: Nature Communications
+    type: rss
+    field: multidisciplinary
+    url_template: https://www.nature.com/ncomms.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: sci_reports
+    name: Scientific Reports
+    type: rss
+    field: multidisciplinary
+    url_template: https://www.nature.com/srep.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: false
+
+  - key: science_main
+    name: Science
+    type: rss
+    field: multidisciplinary
+    url_template: https://www.science.org/action/showFeed?type=etoc&feed=rss&jc=science
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: science_advances
+    name: Science Advances
+    type: rss
+    field: multidisciplinary
+    url_template: https://www.science.org/action/showFeed?type=etoc&feed=rss&jc=sciadv
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: pnas
+    name: PNAS
+    type: rss
+    field: multidisciplinary
+    url_template: https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=PNAS
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: cell
+    name: Cell
+    type: rss
+    field: life_sciences
+    url_template: https://www.cell.com/cell/current.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: false
+
+  - key: elife
+    name: eLife
+    type: rss
+    field: life_sciences
+    url_template: https://elifesciences.org/rss/recent.xml
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: plos_one
+    name: PLOS ONE
+    type: rss
+    field: multidisciplinary
+    url_template: https://journals.plos.org/plosone/feed/atom
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: biorxiv_rss
+    name: bioRxiv（RSS，全部学科）
+    type: rss
+    field: life_sciences
+    url_template: https://connect.biorxiv.org/biorxiv_xml.php?subject=all
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 1 }
+    enabled: false
+
+  - key: medrxiv_rss
+    name: medRxiv（RSS，全部学科）
+    type: rss
+    field: medicine
+    url_template: https://connect.medrxiv.org/medrxiv_xml.php?subject=all
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 1 }
+    enabled: false
+
+  - key: lancet
+    name: The Lancet
+    type: rss
+    field: medicine
+    url_template: https://www.thelancet.com/rssfeed/lancet_current.xml
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: false
+
+  - key: jama
+    name: JAMA
+    type: rss
+    field: medicine
+    url_template: https://jamanetwork.com/rss/site_3/67.xml
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: false
+
+  - key: bmj
+    name: BMJ
+    type: rss
+    field: medicine
+    url_template: https://www.bmj.com/rss/recent.xml
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: false
+
+  - key: nejm
+    name: NEJM
+    type: rss
+    field: medicine
+    url_template: https://www.nejm.org/action/showFeed?jc=nejm&type=etoc&feed=rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: false
+
+  - key: wiley_urban
+    name: Wiley · Journal of Urban Affairs 类（示例 eISSN）
+    type: rss
+    field: urban
+    url_template: https://onlinelibrary.wiley.com/feed/14679908/most-recent
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: false
+
+  - key: tandf_planning
+    name: Taylor & Francis · Planning（示例）
+    type: rss
+    field: urban
+    url_template: https://www.tandfonline.com/feed/rss/rjpa20
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: false
+
+  - key: springer_computing
+    name: Springer · Computing（示例 journal-id）
+    type: rss
+    field: cs
+    url_template: https://link.springer.com/search.rss?facet-journal-id=407&search-within=Journal&query=
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: false
+
+  - key: sage_epb
+    name: SAGE · Environment and Planning B
+    type: rss
+    field: urban
+    url_template: https://journals.sagepub.com/action/showFeed?type=etoc&feed=rss&jc=epb
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: false

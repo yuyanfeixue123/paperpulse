@@ -1,0 +1,55 @@
+{% extends "layouts/base.html" %}
+{% block title %}后台 · PaperPulse{% endblock %}
+{% block content %}
+<h1>后台概览</h1>
+
+<div class="grid3">
+  <div class="card stat"><div class="v">{{ stats.users }}</div><div class="k">用户</div></div>
+  <div class="card stat"><div class="v">{{ stats.interests }}</div><div class="k">活跃订阅</div></div>
+  <div class="card stat"><div class="v">{{ stats.papers }}</div><div class="k">论文池条数</div></div>
+  <div class="card stat"><div class="v">{{ stats.digests }}</div><div class="k">已生成摘要</div></div>
+  <div class="card stat"><div class="v">{{ stats.deliveries_pending }}</div><div class="k">待发/顺延</div></div>
+  <div class="card stat"><div class="v">{{ stats.deliveries_failed }}</div><div class="k">投递失败</div></div>
+</div>
+
+<div class="row" style="margin-bottom:12px">
+  <a class="btn secondary small" href="/admin/users">用户</a>
+  <a class="btn secondary small" href="/admin/sources">数据源</a>
+  <a class="btn secondary small" href="/admin/storage">存储</a>
+  <a class="btn secondary small" href="/admin/email">邮件</a>
+  <a class="btn secondary small" href="/admin/llm">LLM</a>
+  <a class="btn secondary small" href="/admin/system">系统自检</a>
+</div>
+
+<div class="card">
+  <h2>最近任务</h2>
+  <table>
+    <tr><th>ID</th><th>类型</th><th>状态</th><th>调度时间</th><th>完成时间</th><th>重试</th><th>错误</th></tr>
+    {% for t in recent %}
+    <tr>
+      <td>{{ t.id }}</td>
+      <td>{{ t.kind }}</td>
+      <td><span class="badge {% if t.status == 'done' %}ok{% elif t.status == 'failed' %}err{% else %}warn{% endif %}">{{ t.status }}</span></td>
+      <td class="small muted">{{ t.scheduled_at }}</td>
+      <td class="small muted">{{ t.finished_at or '—' }}</td>
+      <td>{{ t.attempts }}</td>
+      <td class="small muted">{{ t.last_error[:80] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>近 7 天 LLM 用量</h2>
+  {% if usage %}
+  <table>
+    <tr><th>用途</th><th>调用次数</th><th>Prompt tokens</th><th>Completion tokens</th></tr>
+    {% for kind, u in usage.items() %}
+    <tr><td>{{ kind }}</td><td>{{ u.calls }}</td><td>{{ u.prompt }}</td><td>{{ u.completion }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+    <p class="muted small">暂无调用记录。</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "layouts/base.html" %}
+{% block title %}账户设置{% endblock %}
+{% block content %}
+<h1>账户设置</h1>
+
+<div class="card">
+  <h2>基本资料</h2>
+  <form method="post" action="/account/profile">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid2">
+      <div class="field">
+        <label>昵称</label>
+        <input type="text" name="display_name" value="{{ current_user.display_name }}">
+      </div>
+      <div class="field">
+        <label>时区</label>
+        <select name="timezone">
+          {% for tz in timezones %}
+            <option value="{{ tz }}" {% if tz == current_user.timezone %}selected{% endif %}>{{ tz }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <button type="submit">保存</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>修改密码</h2>
+  <form method="post" action="/account/password">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid2">
+      <div class="field">
+        <label>当前密码</label>
+        <input type="password" name="old_password">
+      </div>
+      <div class="field">
+        <label>新密码</label>
+        <input type="password" name="new_password">
+      </div>
+    </div>
+    <button type="submit">更新密码</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>LLM API Key</h2>
+  <p class="small muted">
+    {% if current_user.llm_base_url and current_user.llm_api_key_enc %}
+      已配置自带 Key（{{ current_user.llm_base_url }}）。留空则回落到系统全局凭据。
+    {% else %}
+      未配置自带 Key。若管理员已配置全局凭据则可直接使用；否则需配置后才能创建订阅。
+    {% endif %}
+  </p>
+  <p class="small"><a href="/account/llm">前往 API Key 配置页 →</a></p>
+</div>
+
+<div class="card">
+  <h2>高级：自带 LLM（选填）</h2>
+  <p class="small muted">填写后该账号的 AI 调用走你自己的 Key 与预算；留空则自动使用系统全局凭据。</p>
+  <form method="post" action="/account/byok">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="field">
+      <label>Base URL</label>
+      <input type="url" name="llm_base_url" value="{{ current_user.llm_base_url }}">
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label>API Key</label>
+        <input type="password" name="llm_api_key" placeholder="留空表示不修改">
+      </div>
+      <div class="field">
+        <label>模型</label>
+        <input type="text" name="llm_model" value="{{ current_user.llm_model }}">
+      </div>
+    </div>
+    <button type="submit">保存</button>
+  </form>
+</div>
+{% endblock %}

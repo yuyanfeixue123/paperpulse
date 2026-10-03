@@ -1,0 +1,143 @@
+{% extends "layouts/base.html" %}
+{% block title %}确认订阅配置{% endblock %}
+{% block content %}
+<div class="steps">
+  <span class="step done">1 描述兴趣</span>
+  <span class="step active">2 确认配置</span>
+  <span class="step">3 保存</span>
+</div>
+
+{% if degraded %}
+  <div class="notice">未启用 AI 解析（关键词模式），以下为本地抽取结果，请补充或修正关键词。</div>
+{% endif %}
+
+<form method="post" action="/interests">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <div class="card">
+    <h2>基本信息</h2>
+    <div class="field">
+      <label>订阅名称</label>
+      <input type="text" name="name" value="{{ profile.name }}" required>
+    </div>
+    <div class="field">
+      <label>兴趣描述</label>
+      <textarea name="description">{{ profile.description }}</textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>关键词</h2>
+    <div class="field">
+      <label>必须包含（逗号分隔）</label>
+      <input type="text" name="include_keywords" value="{{ profile.include_keywords | join(', ') }}">
+    </div>
+    <div class="field">
+      <label>明确排除（逗号分隔）</label>
+      <input type="text" name="exclude_keywords" value="{{ profile.exclude_keywords | join(', ') }}">
+    </div>
+    {% if profile.include_keywords %}
+      <div>
+        {% for k in profile.include_keywords %}<span class="chip">{{ k }}</span>{% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>数据源</h2>
+    <div class="grid3">
+      {% for s in sources %}
+        <label class="small">
+          <input type="checkbox" name="source_keys" value="{{ s.key }}"
+            {% if s.key in profile.suggested_sources %}checked{% endif %}>
+          {{ s.name }}
+        </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>arXiv 分类</h2>
+    <div class="grid3">
+      {% for c in categories %}
+        <label class="small">
+          <input type="checkbox" name="arxiv_categories" value="{{ c }}"
+            {% if c in profile.arxiv_categories %}checked{% endif %}>
+          {{ c }}
+        </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>检索式与阈值</h2>
+    <div class="grid2">
+      <div class="field">
+        <label>arXiv 检索式</label>
+        <input type="text" id="q_arxiv" value="{{ profile.queries.get('arxiv','') }}">
+      </div>
+      <div class="field">
+        <label>OpenAlex 检索式</label>
+        <input type="text" id="q_openalex" value="{{ profile.queries.get('openalex','') }}">
+      </div>
+    </div>
+    <input type="hidden" name="queries" id="queries" value="">
+
+    <div class="grid3">
+      <div class="field">
+        <label>最低分阈值（0–5）</label>
+        <input type="number" name="min_score" min="0" max="5"
+               value="{{ profile.min_score or defaults.min_score }}">
+      </div>
+      <div class="field">
+        <label>每日推送篇数</label>
+        <input type="number" name="max_papers_per_day" min="1" max="50"
+               value="{{ profile.max_papers_per_day or defaults.max_papers_per_day }}">
+      </div>
+      <div class="field">
+        <label>回看天数</label>
+        <input type="number" name="lookback_days" min="1" max="30"
+               value="{{ defaults.lookback_days }}">
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label>推送时间（本地时区）</label>
+        <input type="text" name="send_at" value="08:30" placeholder="08:30">
+      </div>
+      <div class="field">
+        <label>时区</label>
+        <select name="timezone">
+          {% for tz in timezones %}
+            <option value="{{ tz }}" {% if tz == 'Asia/Shanghai' %}selected{% endif %}>{{ tz }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <label class="small">
+      <input type="checkbox" name="auto_optimize" value="1" checked>
+      允许根据反馈自动优化画像
+    </label>
+    <br><br>
+    <label class="small">
+      <input type="checkbox" name="send_now" value="1">
+      立即推送一份（冷启动）
+    </label>
+  </div>
+
+  <button type="submit" onclick="syncQueries()">保存订阅</button>
+</form>
+
+<script>
+function syncQueries() {
+  const q = {};
+  const a = document.getElementById('q_arxiv').value.trim();
+  const o = document.getElementById('q_openalex').value.trim();
+  if (a) q.arxiv = a;
+  if (o) q.openalex = o;
+  document.getElementById('queries').value = JSON.stringify(q);
+}
+</script>
+{% endblock %}

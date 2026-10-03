@@ -1,0 +1,52 @@
+{% extends "layouts/base.html" %}
+{% block title %}首次部署 · 第 3 步{% endblock %}
+{% block content %}
+<div class="container narrow">
+  <div class="steps">
+    {% for i in range(1, total + 1) %}
+      <span class="step {% if i == step %}active{% elif i < step %}done{% endif %}">{{ i }} {{ titles[i] }}</span>
+    {% endfor %}
+  </div>
+  <div class="card">
+    <h1>3 · LLM 接入</h1>
+    <p class="small muted">用于兴趣解析与论文精排。若暂不配置，可显式选择「纯关键词模式」降级启用。</p>
+
+    <form method="post" action="/admin/setup/3" id="llmForm">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="mode" id="mode" value="llm">
+      <div class="field">
+        <label>Provider</label>
+        <select name="provider">
+          <option value="openai_compatible">OpenAI 兼容（含 DeepSeek / 通义 / Moonshot / vLLM 等）</option>
+          <option value="anthropic">Anthropic 原生</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="ollama">Ollama 本地</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Base URL</label>
+        <input type="url" name="base_url" placeholder="https://api.deepseek.com/v1">
+      </div>
+      <div class="field">
+        <label>API Key</label>
+        <input type="password" name="api_key">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>精排模型</label>
+          <input type="text" name="model_score" placeholder="deepseek-chat">
+        </div>
+        <div class="field">
+          <label>解析模型（选填，默认同精排）</label>
+          <input type="text" name="model_parse">
+        </div>
+      </div>
+      <button type="submit">测试连接并继续</button>
+      <button type="button" class="btn secondary"
+              onclick="document.getElementById('mode').value='keyword';document.getElementById('llmForm').submit()">
+        跳过，使用纯关键词模式
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

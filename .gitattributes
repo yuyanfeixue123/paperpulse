@@ -1,0 +1,24 @@
+# 默认按文本处理，提交时统一为 LF，避免 install.sh 等脚本在 Linux 上因 CRLF 失败
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.mako text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+Dockerfile text eol=lf
+Caddyfile text eol=lf
+*.service text eol=lf
+
+# 二进制
+*.db binary
+*.db-wal binary
+*.db-shm binary
+*.png binary
+*.jpg binary
+*.ico binary

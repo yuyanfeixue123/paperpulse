@@ -1,0 +1,18 @@
+{{ site_name }} · {{ interest_name }}
+{{ digest_date }} · 共 {{ items|length }} 篇
+{% if keyword_mode %}
+（本次未启用 AI 精排，当前为关键词模式）
+{% endif %}
+
+{% for it in items %}
+{{ loop.index }}. {{ it.title }}
+   {{ it.authors[:3] | join(', ') }}{% if it.authors|length > 3 %} 等{% endif %}{% if it.venue %} · {{ it.venue }}{% endif %}{% if it.published_at %} · {{ it.published_at[:10] }}{% endif %}
+   相关度：{{ it.stars }}
+{% if it.reason %}   理由：{{ it.reason }}{% endif %}
+{% if it.doi %}   DOI: https://doi.org/{{ it.doi }}{% endif %}
+   链接: {{ it.url }}
+   有用: {{ it.rate_url[5] }}
+   不感兴趣: {{ it.boring_url }}
+
+{% endfor %}
+退订该订阅: {{ unsub_url }}

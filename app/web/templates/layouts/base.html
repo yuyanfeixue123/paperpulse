@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}PaperPulse{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="/">PaperPulse</a>
+    <nav>
+      {% if current_user %}
+        <a href="/interests">我的订阅</a>
+        <a href="/account">账户</a>
+        {% if current_user.is_admin %}
+          <a href="/admin">后台</a>
+        {% endif %}
+      {% else %}
+        <a href="/login">登录</a>
+        <a href="/register">注册</a>
+      {% endif %}
+    </nav>
+    <div class="spacer"></div>
+    {% if current_user %}
+      <span class="small muted">{{ current_user.email }}</span>
+      <form method="post" action="/logout" style="margin:0">
+        <button class="btn secondary small" type="submit">退出</button>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if keyword_mode %}
+    <div class="container">
+      <div class="notice">
+        当前为关键词模式，未启用 AI 精排。管理员可在「后台 → LLM」补配凭据后立刻生效。
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="container {% if wide %}wide{% endif %} {% if narrow %}narrow{% endif %}">
+    {% if flash %}
+      <div class="flash {{ flash_kind or '' }}">{{ flash }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

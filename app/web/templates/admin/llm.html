@@ -1,0 +1,93 @@
+{% extends "layouts/base.html" %}
+{% block title %}LLM 配置{% endblock %}
+{% block content %}
+<h1>LLM 接入</h1>
+
+<div class="card">
+  <div class="row">
+    <b>当前模式：</b>
+    <span class="badge {% if mode == 'llm' %}ok{% else %}warn{% endif %}">
+      {{ 'AI 模式' if mode == 'llm' else '关键词模式' }}
+    </span>
+    <div class="spacer"></div>
+    <form method="post" action="/admin/llm/test">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn secondary small" type="submit">测试连接</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <h2>厂商预设（一键填入 base_url）</h2>
+  <table>
+    <tr><th>厂商</th><th>Provider</th><th>Base URL</th><th>可选模型</th></tr>
+    {% for name, p in presets.items() %}
+    <tr>
+      <td><b>{{ name }}</b></td>
+      <td class="small muted">{{ p.provider }}</td>
+      <td class="small"><code>{{ p.base_url }}</code></td>
+      <td class="small muted">{{ p.models | join(', ') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>接入配置</h2>
+  <form method="post" action="/admin/llm/save">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="field">
+      <label>Provider</label>
+      <select name="provider">
+        <option value="openai_compatible" {% if settings.llm.provider == 'openai_compatible' %}selected{% endif %}>OpenAI 兼容</option>
+        <option value="anthropic" {% if settings.llm.provider == 'anthropic' %}selected{% endif %}>Anthropic 原生</option>
+        <option value="gemini" {% if settings.llm.provider == 'gemini' %}selected{% endif %}>Gemini 原生</option>
+        <option value="ollama" {% if settings.llm.provider == 'ollama' %}selected{% endif %}>Ollama 本地</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Base URL</label>
+      <input type="url" name="base_url" value="{{ settings.llm.base_url }}" placeholder="https://api.deepseek.com/v1">
+    </div>
+    <div class="field">
+      <label>API Key（加密存储）</label>
+      <input type="password" name="api_key" placeholder="留空表示不修改">
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label>精排模型</label>
+        <input type="text" name="model_score" value="{{ settings.llm.model_score }}">
+      </div>
+      <div class="field">
+        <label>兴趣解析模型</label>
+        <input type="text" name="model_parse" value="{{ settings.llm.model_parse }}">
+      </div>
+    </div>
+    <div class="field">
+      <label>模式</label>
+      <select name="mode">
+        <option value="llm" {% if mode == 'llm' %}selected{% endif %}>AI 模式（解析 + 精排）</option>
+        <option value="keyword" {% if mode == 'keyword' %}selected{% endif %}>纯关键词模式（降级）</option>
+      </select>
+    </div>
+    <button type="submit">保存</button>
+  </form>
+  <p class="small muted" style="margin-top:10px">
+    连接 10s / 读取 60s；429 与 5xx 退避重试 3 次；Lite 模式并发 ≤ 2。
+  </p>
+</div>
+
+<div class="card">
+  <h2>近 30 天用量</h2>
+  {% if usage %}
+  <table>
+    <tr><th>用途</th><th>调用次数</th><th>Prompt</th><th>Completion</th></tr>
+    {% for kind, u in usage.items() %}
+    <tr><td>{{ kind }}</td><td>{{ u.calls }}</td><td>{{ u.prompt }}</td><td>{{ u.completion }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+    <p class="muted small">暂无调用记录。</p>
+  {% endif %}
+</div>
+{% endblock %}

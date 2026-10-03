@@ -1,0 +1,61 @@
+name: 缺陷报告
+description: 报告一个可复现的问题
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请先确认最新版是否仍存在该问题。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 期望行为 vs 实际行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开 /admin/sources
+        2. 点击某个源的「连通性自检」
+        3. 看到 …
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或报错
+      description: `journalctl -u paperpulse -n 100 --no-pager` 的相关片段
+      render: shell
+
+  - type: input
+    id: source-key
+    attributes:
+      label: 涉及的数据源 key
+      placeholder: arxiv / openalex / nber_new …
+    validations:
+      required: false
+
+  - type: dropdown
+    id: deploy
+    attributes:
+      label: 部署方式
+      options:
+        - 裸机 systemd（生产）
+        - Docker Compose（试用）
+        - 本地开发
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      placeholder: v0.1.0 或 git commit
+    validations:
+      required: true

@@ -1,0 +1,36 @@
+{% extends "layouts/base.html" %}
+{% block title %}首次部署 · 第 5 步{% endblock %}
+{% block content %}
+<div class="container wide">
+  <div class="steps">
+    {% for i in range(1, total + 1) %}
+      <span class="step {% if i == step %}active{% elif i < step %}done{% endif %}">{{ i }} {{ titles[i] }}</span>
+    {% endfor %}
+  </div>
+  <div class="card">
+    <h1>5 · 数据源确认</h1>
+    <p class="small muted">默认勾选的是免注册、免 Key 的源。需 Key 的源在填写凭据前不可启用。</p>
+    <form method="post" action="/admin/setup/5">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <table>
+        <tr><th style="width:40px">启用</th><th>名称</th><th>Key</th><th>领域</th><th>类型</th></tr>
+        {% for s in sources %}
+        <tr>
+          <td>
+            <input type="checkbox" name="enabled" value="{{ s.key }}"
+              {% if s.enabled and not s.requires_key %}checked{% endif %}
+              {% if s.requires_key %}disabled{% endif %}>
+          </td>
+          <td>{{ s.name }} <span class="small muted">{{ s.key }}</span></td>
+          <td>{% if s.requires_key %}<span class="badge warn">需 Key</span>{% else %}<span class="badge ok">免注册</span>{% endif %}</td>
+          <td class="small muted">{{ s.field }}</td>
+          <td class="small muted">{{ s.type }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <br>
+      <button type="submit">下一步</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

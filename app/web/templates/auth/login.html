@@ -1,0 +1,22 @@
+{% extends "layouts/base.html" %}
+{% block title %}登录 · PaperPulse{% endblock %}
+{% block content %}
+<div class="container narrow">
+  <div class="card">
+    <h1>登录</h1>
+    <form method="post" action="/login">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field">
+        <label>邮箱</label>
+        <input type="email" name="email" required autofocus>
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input type="password" name="password" required>
+      </div>
+      <button type="submit">登录</button>
+    </form>
+    <p class="small muted" style="margin-top:14px">还没有账号？<a href="/register">注册</a></p>
+  </div>
+</div>
+{% endblock %}

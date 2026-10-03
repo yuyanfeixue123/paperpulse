@@ -1,0 +1,42 @@
+{% extends "layouts/base.html" %}
+{% block title %}PaperPulse · 论文订阅推送{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>PaperPulse</h1>
+  <p>用一句话描述你的研究方向，系统每天从 arXiv、OpenAlex、DOAJ、Europe PMC、Nature / Science / PLOS 等源
+     采集最新论文，按你的兴趣画像筛选后推送到邮箱。</p>
+  <div class="row">
+    {% if user %}
+      <a class="btn" href="/interests">进入我的订阅</a>
+    {% else %}
+      <a class="btn" href="/register">创建账号</a>
+      <a class="btn secondary" href="/login">登录</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid3">
+  <div class="card stat">
+    <div class="v">30+</div>
+    <div class="k">内置数据源</div>
+  </div>
+  <div class="card stat">
+    <div class="v">LLM</div>
+    <div class="k">兴趣解析与精排</div>
+  </div>
+  <div class="card stat">
+    <div class="v">每日</div>
+    <div class="k">定时邮件推送</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>怎么运作</h2>
+  <ol>
+    <li>用自然语言描述兴趣，系统解析成结构化画像（关键词、排除项、推荐源）。</li>
+    <li>每 30 分钟增量采集各源最新论文，去重入池。</li>
+    <li>候选经硬过滤与全文检索召回后，由 LLM 批量精排打分。</li>
+    <li>按你设定的时间推送邮件，邮件内的评分反馈会反过来修订画像。</li>
+  </ol>
+</div>
+{% endblock %}

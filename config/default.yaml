@@ -1,0 +1,59 @@
+# PaperPulse 默认配置（Lite 模式）
+# 加载顺序：default.yaml -> config/config.yaml -> 环境变量(PAPERPULSE_*) -> DB system_settings
+run_mode: lite
+web:
+  host: 127.0.0.1
+  port: 8000
+  workers: 1
+db:
+  url: sqlite:///data/paperpulse.db
+  wal: true
+  busy_timeout_ms: 5000
+  mmap_size_mb: 64
+scheduler:
+  executor_threads: 4
+  fetch_interval_minutes: 30
+  dispatch_interval_minutes: 10
+  purge_hour: 4
+  revise_hour: 5
+  task_soft_timeout_seconds: 600
+pipeline:
+  fetch_window_days: 3          # 增量窗口，重叠设计，靠 upsert 去重
+  fetch_page_size: 100
+  candidate_top_n: 120          # 进入 LLM 的候选上限
+  llm_batch_size: 20
+  llm_concurrency: 2
+  abstract_max_chars: 1200
+  lookback_days: 7              # 只推最近 7 天的论文
+  default_min_score: 4          # score>=4 才推送
+  default_papers_per_day: 10
+  freshness_half_life_days: 14
+llm:
+  provider: openai_compatible   # openai_compatible | anthropic | gemini | ollama
+  base_url: ""                  # 部署者在引导中填
+  api_key: ""                   # 部署者在引导中填（Fernet 加密存 DB）
+  model_score: ""               # 精排模型
+  model_parse: ""               # 兴趣解析模型
+  timeout_connect: 10
+  timeout_read: 60
+  max_retries: 3
+  max_tokens: 4096             # 推理模型（deepseek-flash 等）会消耗 reasoning 预算
+email:
+  daily_budget: 250             # Brevo 免费上限 300，留 50 缓冲
+  max_per_minute: 20
+  from_name: PaperPulse
+retention:
+  days: 30
+  batch_size: 1000
+  vacuum: true
+sources:
+  arxiv_request_interval_seconds: 3
+  contact_email: ""
+site:
+  default_timezone: Asia/Shanghai
+memory:
+  rss_warn_mb: 450               # 超阈值：降并发 + 主动 GC + 记日志
+  rss_hard_mb: 650               # 超硬限：暂停采集，只保推送
+disk:
+  usage_warn_pct: 80             # 触发一次紧急清理（保留天数收紧到 7 天）
+  usage_hard_pct: 90             # 停止采集，仅保留推送与清理

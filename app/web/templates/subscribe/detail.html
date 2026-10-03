@@ -1,0 +1,74 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ interest.name }}{% endblock %}
+{% block content %}
+<div class="row" style="margin-bottom:16px">
+  <h1 style="margin:0">{{ interest.name }}</h1>
+  <span class="badge {% if interest.is_active %}ok{% else %}warn{% endif %}">
+    {{ '启用' if interest.is_active else '暂停' }}
+  </span>
+  <span class="badge">v{{ interest.version }}</span>
+  <div class="spacer"></div>
+  <a class="btn secondary small" href="/interests">返回</a>
+</div>
+
+<div class="card">
+  <h2>画像</h2>
+  <p>{{ interest.description }}</p>
+  <h3>包含关键词</h3>
+  <div>{% for k in profile.include_keywords %}<span class="chip">{{ k }}</span>{% else %}<span class="muted small">无</span>{% endfor %}</div>
+  <h3>排除关键词</h3>
+  <div>{% for k in profile.exclude_keywords %}<span class="chip">{{ k }}</span>{% else %}<span class="muted small">无</span>{% endfor %}</div>
+  <h3>检索式</h3>
+  <pre class="small">{{ profile.queries or {} }}</pre>
+</div>
+
+<div class="card">
+  <h2>推送设置</h2>
+  <table>
+    <tr><th>每日篇数</th><td>{{ interest.max_papers_per_day }}</td></tr>
+    <tr><th>最低分</th><td>{{ interest.min_score }}</td></tr>
+    <tr><th>回看天数</th><td>{{ interest.lookback_days }}</td></tr>
+    <tr><th>推送时间</th><td>{{ interest.send_at }}（{{ interest.timezone }}）</td></tr>
+    <tr><th>下次推送</th><td>{{ interest.next_due_at or '未排期' }}</td></tr>
+    <tr><th>上次修订</th><td>{{ interest.last_revised_at or '—' }}</td></tr>
+    <tr><th>自动优化</th><td>{{ '开' if interest.auto_optimize else '关' }}</td></tr>
+  </table>
+  <div class="row" style="margin-top:14px">
+    <form method="post" action="/interests/{{ interest.id }}/toggle">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn secondary small" type="submit">{{ '暂停' if interest.is_active else '启用' }}</button>
+    </form>
+    <form method="post" action="/interests/{{ interest.id }}/delete"
+          onsubmit="return confirm('确认删除该订阅？')">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn danger small" type="submit">删除</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <h2>画像修订历史</h2>
+  {% if not revisions %}
+    <p class="muted small">暂无修订记录。</p>
+  {% endif %}
+  {% for r in revisions %}
+    <div class="paper">
+      <div class="row">
+        <b>v{{ r.from_version }} → v{{ r.to_version }}</b>
+        <span class="small muted">{{ r.created_at }}</span>
+        {% if r.rolled_back_at %}<span class="badge warn">已回滚</span>{% endif %}
+        <div class="spacer"></div>
+        {% if not r.rolled_back_at %}
+          <form method="post" action="/interests/{{ interest.id }}/rollback">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="version" value="{{ r.from_version }}">
+            <button class="btn secondary small" type="submit">回滚到 v{{ r.from_version }}</button>
+          </form>
+        {% endif %}
+      </div>
+      <p class="small">{{ r.rationale }}</p>
+      <pre class="small muted">{{ r.patch_json }}</pre>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

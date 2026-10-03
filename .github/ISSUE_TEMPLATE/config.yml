@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 部署问题（前置检查 / systemd / Caddy）
+    url: https://github.com/yuyanfeixue123/paperpulse/discussions
+    about: 部署相关问题更适合在 Discussions 里问答
+  - name: 安全漏洞
+    url: https://github.com/yuyanfeixue123/paperpulse/security/advisories/new
+    about: 请勿在公开 issue 中报告安全漏洞

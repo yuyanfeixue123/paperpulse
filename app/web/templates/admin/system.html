@@ -1,0 +1,14 @@
+{% extends "layouts/base.html" %}
+{% block title %}系统自检{% endblock %}
+{% block content %}
+<h1>系统自检</h1>
+{% for name, r in checks.items() %}
+<div class="card">
+  <div class="row">
+    <b>{{ name }}</b>
+    <span class="badge {% if r.ok %}ok{% else %}err{% endif %}">{{ '正常' if r.ok else '异常' }}</span>
+  </div>
+  <pre class="small muted" style="white-space:pre-wrap;margin:6px 0 0">{{ r.detail }}</pre>
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "layouts/base.html" %}
+{% block title %}新建订阅 · 第 1 步{% endblock %}
+{% block content %}
+<div class="steps">
+  <span class="step active">1 描述兴趣</span>
+  <span class="step">2 生成配置</span>
+  <span class="step">3 确认保存</span>
+</div>
+
+<div class="card">
+  <h1>用一句话描述你的研究方向</h1>
+  {% if keyword_mode %}
+    <div class="notice">当前为关键词模式，不会调用 AI 解析，将从你的描述中直接抽取关键词。</div>
+  {% endif %}
+  <form method="post" action="/interests/parse">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="field">
+      <textarea name="description" required placeholder="例：我在读城市规划硕士，关心用街景图像和深度学习做建成环境评估，也想看 15 分钟生活圈和公共交通可达性的研究。不想看纯算法理论推导，也不想看医学图像分割。"></textarea>
+    </div>
+    <button type="submit">生成订阅配置</button>
+  </form>
+</div>
+{% endblock %}

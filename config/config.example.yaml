@@ -1,0 +1,24 @@
+# 复制为 config/config.yaml 后修改。
+# 仅填写你需要覆盖的项——未列出的项取 config/default.yaml 的默认值。
+# 敏感凭据（LLM api_key、邮件密码）建议改在后台填写，会自动加密后写入本文件的 enc: 形式。
+
+run_mode: lite
+
+web:
+  host: 127.0.0.1
+  port: 8000
+
+db:
+  url: sqlite:///data/paperpulse.db
+
+sources:
+  # 进入 OpenAlex / Crossref 的 polite pool，建议填写
+  contact_email: you@example.com
+
+# LLM 可在后台「LLM」页配置（会自动写入此处）
+# llm:
+#   provider: openai_compatible
+#   base_url: https://api.deepseek.com/v1
+#   api_key: "enc:..."
+#   model_score: deepseek-chat
+#   model_parse: deepseek-chat

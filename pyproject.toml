@@ -1,0 +1,68 @@
+[project]
+name = "paperpulse"
+version = "0.1.0"
+description = "定时采集最新论文元数据，按兴趣画像筛选并每日邮件推送"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "python-multipart",
+    "sqlalchemy",
+    "alembic",
+    "apscheduler",
+    "httpx",
+    "feedparser",
+    "pydantic",
+    "pydantic-settings",
+    "pyyaml",
+    "structlog",
+    "argon2-cffi",
+    "cryptography",
+    "tenacity",
+    "python-dateutil",
+    "email-validator",
+    "jieba",
+    "tzdata",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "respx",
+    "ruff",
+    "mypy",
+    "aiosmtpd",
+]
+
+[project.scripts]
+paperpulse = "app.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "migrations", "data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501", "B008"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+exclude = ["migrations/", ".venv/"]

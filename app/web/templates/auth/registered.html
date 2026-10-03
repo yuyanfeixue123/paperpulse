@@ -1,0 +1,12 @@
+{% extends "layouts/base.html" %}
+{% block title %}注册成功 · PaperPulse{% endblock %}
+{% block content %}
+<div class="container narrow">
+  <div class="card">
+    <h1>验证邮件已发送</h1>
+    <p>我们向 <b>{{ email }}</b> 发送了一封验证邮件，请点击其中的链接激活账号。</p>
+    <p class="small muted">若未收到，请检查垃圾邮件目录。</p>
+    <a class="btn secondary" href="/login">返回登录</a>
+  </div>
+</div>
+{% endblock %}

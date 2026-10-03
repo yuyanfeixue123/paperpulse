@@ -1,0 +1,31 @@
+{% extends "layouts/base.html" %}
+{% block title %}首次部署 · 第 2 步{% endblock %}
+{% block content %}
+<div class="container narrow">
+  <div class="steps">
+    {% for i in range(1, total + 1) %}
+      <span class="step {% if i == step %}active{% elif i < step %}done{% endif %}">{{ i }} {{ titles[i] }}</span>
+    {% endfor %}
+  </div>
+  <div class="card">
+    <h1>2 · 站点信息</h1>
+    <p class="small muted">对外 URL 用于生成邮件中的退订与跳转链接，需带协议（https://）。</p>
+    <form method="post" action="/admin/setup/2">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field">
+        <label>站点名称</label>
+        <input type="text" name="site_name" value="{{ site_name }}">
+      </div>
+      <div class="field">
+        <label>对外 URL</label>
+        <input type="url" name="site_url" placeholder="https://papers.example.com" required>
+      </div>
+      <div class="field">
+        <label>默认时区</label>
+        <input type="text" name="timezone" value="{{ timezone }}">
+      </div>
+      <button type="submit">下一步</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "layouts/base.html" %}
+{% block title %}数据源{% endblock %}
+{% block content %}
+<div class="row" style="margin-bottom:12px">
+  <h1 style="margin:0">数据源</h1>
+  <span class="badge ok">已启用 {{ enabled }}</span>
+  <span class="badge">共 {{ total }}</span>
+  <div class="spacer"></div>
+  <a class="btn secondary small" href="/admin">返回后台</a>
+</div>
+
+<div class="card">
+  <h2>添加自定义 RSS</h2>
+  <form method="post" action="/admin/sources/add_rss" class="row">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="text" name="name" placeholder="名称" style="width:200px">
+    <input type="url" name="url" placeholder="https://example.com/feed.rss" style="flex:1">
+    <input type="text" name="field" placeholder="领域" style="width:140px" value="custom">
+    <button class="btn small" type="submit">添加</button>
+  </form>
+  <p class="small muted">仅接受 http/https，拒绝内网与回环地址。</p>
+</div>
+
+{% for field, items in grouped.items() %}
+<div class="card">
+  <h2>{{ field }}</h2>
+  <table>
+    <tr><th style="width:50px">启用</th><th>名称</th><th>认证</th><th>类型</th><th>自检</th><th>凭据</th></tr>
+    {% for s in items %}
+    <tr>
+      <td>
+        <form method="post" action="/admin/sources/{{ s.key }}/toggle">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="checkbox" onchange="this.form.submit()"
+                 {% if s.enabled %}checked{% endif %}
+                 {% if s.requires_key and not s.has_key %}disabled{% endif %}>
+        </form>
+      </td>
+      <td>{{ s.name }}<br><span class="small muted">{{ s.key }}</span></td>
+      <td>
+        {% if s.requires_key %}
+          <span class="badge {% if s.has_key %}ok{% else %}warn{% endif %}">
+            {{ '已配置 Key' if s.has_key else '需 Key' }}
+          </span>
+        {% else %}
+          <span class="badge ok">免注册</span>
+        {% endif %}
+      </td>
+      <td class="small muted">{{ s.type }}</td>
+      <td>
+        <form method="post" action="/admin/sources/check" onsubmit="return checkSource(this, '{{ s.key }}')">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="key" value="{{ s.key }}">
+          <button class="btn secondary small" type="submit">连通性自检</button>
+        </form>
+      </td>
+      <td>
+        {% if s.requires_key %}
+          <form method="post" action="/admin/sources/{{ s.key }}/credential" class="row" style="gap:4px">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="password" name="value" placeholder="API Key" style="width:140px">
+            <button class="btn secondary small" type="submit">保存</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endfor %}
+
+<script>
+async function checkSource(form, key) {
+  event.preventDefault();
+  const fd = new FormData(form);
+  const res = await fetch('/admin/sources/check', {method:'POST', body: fd});
+  const data = await res.json();
+  alert(key + '：' + data.message);
+  return false;
+}
+</script>
+{% endblock %}
