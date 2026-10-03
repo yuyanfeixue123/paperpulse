@@ -96,10 +96,20 @@ sudo -u paperpulse -H /opt/paperpulse/.venv/bin/python -m app.cli setup
 ## 5 升级与回滚
 
 ```bash
-git pull && uv sync --frozen && alembic upgrade head && systemctl restart paperpulse
+sudo -u paperpulse -H git -C /opt/paperpulse pull --ff-only
+sudo -u paperpulse -H /opt/paperpulse/.venv/bin/uv sync --frozen --directory /opt/paperpulse
+systemctl restart paperpulse
 # 失败回滚
-git checkout <上一个 tag> && uv sync --frozen && systemctl restart paperpulse
+sudo -u paperpulse -H git -C /opt/paperpulse checkout <上一个 tag>
+systemctl restart paperpulse
 ```
+
+> **若以 root 身份执行 `git pull` 报 `detected dubious ownership`**：仓库属主是 `paperpulse`，
+> 而 git 拒绝在身份不匹配时操作。加上白名单即可：
+>
+> ```bash
+> git config --global --add safe.directory /opt/paperpulse
+> ```
 
 ## 6 备份
 
