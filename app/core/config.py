@@ -16,8 +16,35 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = ROOT / "config" / "default.yaml"
 USER_CONFIG = ROOT / "config" / "config.yaml"
+ENV_FILE = ROOT / ".env"
 
 ENV_PREFIX = "PAPERPULSE_"
+
+
+def load_env_file() -> None:
+    """把 .env 载入 os.environ（不覆盖已存在的变量）。
+
+    systemd 通过 EnvironmentFile 注入密钥；手动跑 CLI 时没有这一步，
+    会导致自检误报「密钥缺失」。这里补齐，使两种入口行为一致。
+    """
+    if not ENV_FILE.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(ENV_FILE, override=False)
+        return
+    except ImportError:
+        pass
+    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+
+
+load_env_file()
 
 
 class WebConfig(BaseModel):

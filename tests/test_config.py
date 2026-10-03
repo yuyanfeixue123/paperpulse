@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 from app.core.config import (
     _deep_merge,
@@ -72,3 +73,41 @@ def test_rate_limit_enforces_interval():
             http.limited_get("https://example.com", "__testsrc__")
         elapsed = time.time() - t0
     assert elapsed >= 0.8, f"三次请求应至少间隔 2×0.4s，实际 {elapsed:.2f}s"
+
+
+def test_env_file_is_loaded(monkeypatch):
+    """回归：systemd 用 EnvironmentFile 注入密钥，CLI 手动运行不会，
+    导致自检误报「密钥缺失」。config 模块导入时应把 .env 载入 os.environ。"""
+    import os
+
+    from app.core import config
+
+    env_file = Path(__file__).resolve().parents[1] / "data" / "_test_env_fixture"
+    env_file.parent.mkdir(exist_ok=True)
+    env_file.write_text('PAPERPULSE_TEST_ENVFILE="loaded"\n', encoding="utf-8")
+    monkeypatch.setattr(config, "ENV_FILE", env_file)
+    monkeypatch.delenv("PAPERPULSE_TEST_ENVFILE", raising=False)
+    try:
+        config.load_env_file()
+        assert os.environ["PAPERPULSE_TEST_ENVFILE"] == "loaded"
+    finally:
+        monkeypatch.delenv("PAPERPULSE_TEST_ENVFILE", raising=False)
+        env_file.unlink(missing_ok=True)
+
+
+def test_env_file_does_not_override_existing(monkeypatch):
+    import os
+
+    from app.core import config
+
+    env_file = Path(__file__).resolve().parents[1] / "data" / "_test_env_fixture2"
+    env_file.parent.mkdir(exist_ok=True)
+    env_file.write_text("PAPERPULSE_TEST_ENVFILE2=fromfile\n", encoding="utf-8")
+    monkeypatch.setattr(config, "ENV_FILE", env_file)
+    monkeypatch.setenv("PAPERPULSE_TEST_ENVFILE2", "fromenv")
+    try:
+        config.load_env_file()
+        assert os.environ["PAPERPULSE_TEST_ENVFILE2"] == "fromenv"
+    finally:
+        monkeypatch.delenv("PAPERPULSE_TEST_ENVFILE2", raising=False)
+        env_file.unlink(missing_ok=True)

@@ -99,16 +99,35 @@ sed -e "s#/opt/paperpulse#${APP_DIR}#g" \
 # EnvironmentFile 只需一行，去掉第二行重复的 Environment
 sed -i '/^Environment=PAPERPULSE_ENCRYPTION_KEY=/d' /etc/systemd/system/paperpulse.service
 
-if command -v caddy >/dev/null 2>&1; then
-  sed "s#your.domain#${DOMAIN}#g" "$APP_DIR/deploy/caddy/Caddyfile" > /etc/caddy/Caddyfile
-  systemctl reload caddy || true
-else
-  echo "未检测到 Caddy，已跳过反代配置。可手动安装："
-  echo "  apt install -y debian-keyring debian-archive-keyring apt-transport-https"
-  echo "  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' -o /usr/share/keyrings/caddy-archive-keyring.gpg"
-  echo "  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' -o /etc/apt/sources.list.d/caddy-stable.list"
-  echo "  apt update && apt install caddy"
+if ! command -v caddy >/dev/null 2>&1; then
+  # Caddy 官方源。注意：Cloudsmith 会轮换签名密钥，官方文档里的 key 有时效性，
+  # 因此先尝试标准流程，失败则退回 trusted=yes（源站由 Cloudflare 的 TLS 保护）。
+  say "安装 Caddy"
+  apt-get install -y -qq debian-keyring debian-archive-keyring apt-transport-https gnupg
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' -o /tmp/caddy.key || true
+  gpg --batch --yes --dearmor --no-tty \
+      -o /usr/share/keyrings/caddy-archive-keyring.gpg /tmp/caddy.key 2>/dev/null || true
+  rm -f /tmp/caddy.key
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+    -o /etc/apt/sources.list.d/caddy-stable.list || true
+  if ! apt-get update -qq 2>/dev/null; then
+    echo "  官方源签名校验失败，改用 trusted=yes"
+    sed -i 's#\[signed-by=[^]]*\]#[trusted=yes]#' /etc/apt/sources.list.d/caddy-stable.list
+    apt-get update -qq
+  fi
+  apt-get install -y -qq caddy
 fi
+
+# Caddy 以 caddy 用户运行；日志目录必须归属该用户，否则启动即失败。
+# （ProtectSystem=full 沙箱下以 root 预建会导致日志文件属主错误）
+mkdir -p /var/log/caddy
+chown caddy:caddy /var/log/caddy
+chmod 750 /var/log/caddy
+rm -f /var/log/caddy/paperpulse.log
+
+sed "s#your.domain#${DOMAIN}#g" "$APP_DIR/deploy/caddy/Caddyfile" > /etc/caddy/Caddyfile
+caddy validate --config /etc/caddy/Caddyfile || true
+systemctl reload caddy || systemctl restart caddy || true
 
 systemctl daemon-reload
 systemctl enable --now paperpulse
