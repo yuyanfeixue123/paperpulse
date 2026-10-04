@@ -99,6 +99,10 @@ class EmailConfig(BaseModel):
     max_per_minute: int = 20
     from_name: str = "PaperPulse"
     content_filter_patterns: list[str] = []
+    auto_probe_keywords: bool = True
+    probe_address: str = ""
+    probe_daily_budget: int = 8
+    probe_confirmations: int = 2
 
 
 class RetentionConfig(BaseModel):

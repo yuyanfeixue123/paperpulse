@@ -193,6 +193,17 @@ Matching papers stay out of the email body and appear in the web feed only; the
 email then states how many were withheld and links to the full list. See
 [Email delivery setup](docs/guides/email-delivery-setup.md).
 
+### Channel-adaptive term library
+
+When a delivery is rejected by the mail channel's content filter, the system asks
+the admin-configured LLM for candidate terms, then sends **one minimal probe email per
+term** to the address you configure. Terms blocked twice in a row land in the
+[term library](/admin/terms) and are kept out of future email bodies.
+
+Two confirmations are required (guards against filter flapping), probes only go to your
+own address, and there is a daily cap. See
+[Email delivery setup](docs/guides/email-delivery-setup.md).
+
 ## Known limitations
 
 - **Chinese input without an LLM.** The local tokenizer emits Chinese keywords while the pool holds English metadata, and FTS5's `unicode61` tokenizer cannot match across languages. Configure an LLM and bilingual keywords are produced, which removes the limitation.

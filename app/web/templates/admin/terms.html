@@ -1,0 +1,91 @@
+{% extends "layouts/base.html" %}
+{% block title %}通道词库 · PaperPulse{% endblock %}
+{% block content %}
+<div class="row" style="margin-bottom:16px">
+  <h1 style="margin:0">通道词库</h1>
+  <div class="spacer"></div>
+  <a class="btn secondary small" href="/admin">返回后台</a>
+</div>
+
+<div class="card">
+  <h2>这是什么</h2>
+  <p class="small">
+    邮件服务商的内容审核是黑盒：只有真把信投出去，才知道哪个词会被拦。
+    当投递因内容策略被拒时，系统会用管理员配置的 LLM 猜候选词，
+    再用<strong>只含单个候选词</strong>的最小探测邮件逐个试投，
+    把稳定被拒的词沉淀到这里。命中词库的论文<strong>不进邮件正文</strong>，
+    仍完整保留在站内 <a href="/feed">今日推荐</a>。
+  </p>
+  <p class="small muted">
+    采集、召回、打分链路<strong>不做任何过滤</strong>，过滤只发生在邮件渲染层。
+  </p>
+</div>
+
+<div class="card">
+  <h2>当前设置</h2>
+  <table>
+    <tr><th style="width:200px">自动探测</th>
+        <td>{% if auto_probe %}<span class="badge ok">开启</span>{% else %}<span class="badge warn">关闭</span>{% endif %}
+            <span class="small muted">　config.yaml → email.auto_probe_keywords</span></td></tr>
+    <tr><th>探测收件地址</th>
+        <td>{{ probe_address or '未设置（探测不会触发）' }}
+            <span class="small muted">　email.probe_address</span></td></tr>
+    <tr><th>每日探测预算</th>
+        <td>{{ probe_budget }} 封 <span class="small muted">　email.probe_daily_budget，硬上限 50</span></td></tr>
+    <tr><th>入库确认次数</th>
+        <td>连续 {{ probe_confirmations }} 次被拒才激活 <span class="small muted">　email.probe_confirmations</span></td></tr>
+  </table>
+  <p class="small muted">
+    探测邮件是<strong>真实发送</strong>的，会消耗邮箱额度，因此默认每日上限较低。
+    建议把探测收件地址填成部署者自己的邮箱。
+  </p>
+</div>
+
+<div class="card">
+  <h2>手工添加</h2>
+  <form method="post" action="/admin/terms/add" class="row">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="text" name="term" placeholder="词或短语，如 transgender / 跨性别" style="flex:1" required>
+    <button class="btn small" type="submit">加入词库</button>
+  </form>
+  <p class="small muted">按字面量匹配，不会被当作正则执行。</p>
+</div>
+
+<div class="card">
+  <h2>词库（{{ rows|length }}）</h2>
+  {% if not rows %}
+    <p class="muted small">词库为空。当投递被内容审核拒收时，系统会自动探测并填充。</p>
+  {% else %}
+  <table>
+    <tr>
+      <th>状态</th><th>词</th><th>来源</th><th>通道</th>
+      <th>被拒/放行</th><th>最近探测</th><th>操作</th>
+    </tr>
+    {% for r in rows %}
+    <tr>
+      <td>
+        {% if r.active %}<span class="badge err">生效中</span>
+        {% else %}<span class="badge">已停用</span>{% endif %}
+      </td>
+      <td><b>{{ r.term }}</b></td>
+      <td><span class="badge">{{ '自动探测' if r.source == 'auto-probe' else '手工' }}</span></td>
+      <td class="small muted">{{ r.provider or '—' }}</td>
+      <td class="small">{{ r.blocked_hits }} / {{ r.miss_hits }}</td>
+      <td class="small muted">{{ r.last_tested_at }}</td>
+      <td class="row" style="gap:6px">
+        <form method="post" action="/admin/terms/{{ r.id }}/toggle">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn secondary small" type="submit">{{ '停用' if r.active else '启用' }}</button>
+        </form>
+        <form method="post" action="/admin/terms/{{ r.id }}/delete"
+              onsubmit="return confirm('确认从词库删除？')">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn danger small" type="submit">删除</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

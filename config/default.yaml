@@ -49,6 +49,12 @@ email:
   # 导致整封被拒（554 Reject by content spam），把可用额度白白浪费掉。
   # 留空表示不做过滤；按自己通道的政策与研究领域按需填写。
   content_filter_patterns: []
+  # 通道自适应词库：投递被内容审核拒绝时，自动探测哪些词会被拦，沉淀进词库。
+  # 探测邮件是**真实发送**的，会消耗额度，因此有严格上限。
+  auto_probe_keywords: true
+  probe_address: ""              # 探测邮件收件人，建议填部署者自己的邮箱
+  probe_daily_budget: 8          # 每日探测封数上限（硬上限 50）
+  probe_confirmations: 2         # 连续 N 次被拒才把词入库，规避过滤器抖动误封
 retention:
   days: 30
   batch_size: 1000

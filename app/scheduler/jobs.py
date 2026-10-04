@@ -128,6 +128,24 @@ def task_flush(_payload: dict) -> None:
     flush_deliveries()
 
 
+@register("probe_channel_terms")
+def task_probe_channel_terms(payload: dict) -> None:
+    """内容审核拒收后，探测哪些词会被拦并沉淀进词库。"""
+    from app.pipeline.probe_task import probe_from_digest
+
+    digest_id = int(payload["digest_id"])
+    report = probe_from_digest(digest_id, str(payload.get("provider") or ""))
+    if report.skipped_reason:
+        log.info("probe.skipped", reason=report.skipped_reason)
+    else:
+        log.info(
+            "probe.done",
+            probed=report.probed,
+            activated=len(report.newly_blocked),
+            cleared=len(report.cleared),
+        )
+
+
 @register("send_welcome")
 def task_send_welcome(payload: dict) -> None:
     """订阅创建后的确认邮件。失败只记日志，不影响订阅本身。"""

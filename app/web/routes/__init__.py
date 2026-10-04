@@ -23,6 +23,9 @@ from app.web.routes import (
     setup,
     subscribe,
 )
+from app.web.routes import (
+    admin_terms as admin_terms,
+)
 
 log = get_logger(__name__)
 
@@ -43,6 +46,7 @@ def register_routes(app: FastAPI) -> None:
         admin_email,
         admin_llm,
         admin_system,
+        admin_terms,
         setup,
     ):
         app.include_router(module.router)

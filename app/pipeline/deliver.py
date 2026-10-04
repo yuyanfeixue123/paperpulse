@@ -180,8 +180,10 @@ def send_delivery(delivery_id: int) -> bool:
         message_id = provider.send(msg)
     except Exception as exc:  # noqa: BLE001
         _release_quota(provider_row.key, quota_date)
-        _fail(delivery_id, f"{type(exc).__name__}: {exc}"[:500])
+        err_text = f"{type(exc).__name__}: {exc}"[:500]
+        _fail(delivery_id, err_text)
         log.error("deliver.failed", id=delivery_id, error=str(exc)[:300])
+        _maybe_schedule_probe(digest_id, provider_row, err_text)
         return False
 
     with SessionLocal() as session:
@@ -194,6 +196,25 @@ def send_delivery(delivery_id: int) -> bool:
         session.commit()
     log.info("deliver.sent", id=delivery_id, provider=provider_row.key)
     return True
+
+
+def _maybe_schedule_probe(digest_id: int, provider_row, error: str) -> None:
+    """内容策略拒收时，排一次通道词库探测（网络/鉴权类错误不触发）。"""
+    from app.core.config import get_settings
+    from app.pipeline.probe import is_content_rejection
+
+    cfg = get_settings().email
+    if not cfg.auto_probe_keywords:
+        return
+    if not cfg.probe_address:
+        log.info("probe.skipped_no_address", digest=digest_id)
+        return
+    if not is_content_rejection(error):
+        return
+    from app.scheduler.runner import enqueue
+
+    if enqueue("probe_channel_terms", {"digest_id": int(digest_id), "provider": provider_row.key}):
+        log.info("probe.scheduled", digest=digest_id, provider=provider_row.key)
 
 
 def _fail(delivery_id: int, error: str) -> None:

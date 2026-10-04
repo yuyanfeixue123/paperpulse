@@ -29,6 +29,46 @@ log = get_logger(__name__)
 # 措辞不应导致整篇被判定为不可送达。
 _FIELDS = ("title", "reason")
 
+# 词库缓存：词项变动极少，进程内缓存避免每次渲染都查库
+_lib_cache: tuple[float, list[re.Pattern[str]]] | None = None
+_LIB_TTL = 30.0
+
+
+def _library_patterns() -> list[re.Pattern[str]]:
+    """已激活的通道词库项（按字面量匹配）。"""
+    global _lib_cache
+    import time
+
+    now = time.monotonic()
+    if _lib_cache and now - _lib_cache[0] < _LIB_TTL:
+        return _lib_cache[1]
+    out: list[re.Pattern[str]] = []
+    try:
+        from app.core.db import SessionLocal
+        from app.core.utils import escape_for_re
+        from app.models.channel import ChannelTerm
+
+        with SessionLocal() as s:
+            rows = (
+                s.query(ChannelTerm.term)
+                .filter(ChannelTerm.active.is_(True))
+                .all()
+            )
+        for (term,) in rows:
+            try:
+                out.append(re.compile(escape_for_re(str(term)), re.IGNORECASE))
+            except re.error:
+                continue
+    except Exception:  # noqa: BLE001 词库不可用不应影响发信
+        out = []
+    _lib_cache = (now, out)
+    return out
+
+
+def invalidate_library_cache() -> None:
+    global _lib_cache
+    _lib_cache = None
+
 
 def _patterns() -> list[re.Pattern[str]]:
     from app.core.config import get_settings
@@ -52,7 +92,7 @@ def matched_pattern(item: dict[str, Any]) -> str | None:
     blob = " ".join(str(item.get(f, "") or "") for f in _FIELDS)
     if not blob.strip():
         return None
-    for pat in _patterns():
+    for pat in _patterns() + _library_patterns():
         if pat.search(blob):
             return pat.pattern
     return None
@@ -72,7 +112,7 @@ def context_matches(*texts: str | None) -> str | None:
     blob = " ".join(str(t or "") for t in texts)
     if not blob.strip():
         return None
-    for pat in _patterns():
+    for pat in _patterns() + _library_patterns():
         if pat.search(blob):
             return pat.pattern
     return None

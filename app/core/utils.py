@@ -104,3 +104,10 @@ def truncate(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[:limit].rstrip() + "…"
+
+
+def escape_for_re(text: str) -> str:
+    """按字面量转义正则元字符 —— 词库项是探测得来的词，不应被当作正则执行。"""
+    import re as _re
+
+    return _re.escape(text.strip())
