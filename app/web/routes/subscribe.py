@@ -155,9 +155,11 @@ def create_interest(
         session.commit()
         interest_id = int(row.id)
 
-    if send_now:
-        from app.scheduler.runner import enqueue
+    # 确认邮件：入队而非同步发，邮件通道异常不阻塞订阅创建
+    from app.scheduler.runner import enqueue
 
+    enqueue("send_welcome", {"interest_id": interest_id})
+    if send_now:
         enqueue("build_digest", {"interest_id": interest_id})
 
     return RedirectResponse(f"/interests/{interest_id}", status_code=303)

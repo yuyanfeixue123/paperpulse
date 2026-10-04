@@ -282,6 +282,66 @@ def send_verification_email(to_email: str, token: str) -> None:
     provider.send(msg)
 
 
+def send_welcome_email(interest_id: int) -> tuple[bool, str]:
+    """订阅创建后的确认邮件（兼作邮箱验证）。失败不抛异常，由调用方记日志。"""
+    from app.core.utils import load_list
+    from app.models.interest import Interest
+    from app.models.user import User
+    from app.pipeline.digest import compute_next_due
+    from app.pipeline.render import render_welcome
+
+    with SessionLocal() as s:
+        interest = s.get(Interest, interest_id)
+        if interest is None:
+            return False, "订阅不存在"
+        user = s.get(User, int(interest.user_id))
+        if user is None:
+            return False, "用户不存在"
+        sysrow = s.get(SystemSettings, 1)
+        site_url = (sysrow.site_url if sysrow else "") or ""
+        site_name = (sysrow.site_name if sysrow else "") or "PaperPulse"
+        payload = {
+            "to_email": user.email,
+            "site_url": site_url,
+            "site_name": site_name,
+            "interest_name": interest.name,
+            "description": interest.description,
+            "include_keywords": load_list(interest.include_keywords_json),
+            "exclude_keywords": load_list(interest.exclude_keywords_json),
+            "send_at": interest.send_at,
+            "timezone": interest.timezone,
+            "lookback_days": int(interest.lookback_days),
+            "max_papers_per_day": int(interest.max_papers_per_day),
+            "min_score": int(interest.min_score),
+            "first_digest_at": compute_next_due(interest.send_at, interest.timezone),
+            "user_id": int(user.id),
+            "interest_id": interest_id,
+        }
+
+    provider_row = primary_provider()
+    if provider_row is None:
+        return False, "未配置邮件通道"
+
+    subject, html, text = render_welcome(**payload)
+    msg = OutgoingMessage(
+        to_email=payload["to_email"],
+        subject=subject,
+        html=html,
+        text=text,
+        from_email=json.loads(provider_row.config_json or "{}").get("from_email", ""),
+        from_name=get_settings().email.from_name,
+        headers={
+            "X-PaperPulse-Welcome": str(interest_id),
+            "Auto-Submitted": "auto-generated",
+        },
+    )
+    try:
+        provider = build_provider(provider_row.kind, _provider_config(provider_row))
+        return True, provider.send(msg) or "已发送"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"{type(exc).__name__}: {exc}"
+
+
 def quota_status() -> dict[str, Any]:
     today = today_local(_settings_row().default_timezone)
     with SessionLocal() as session:

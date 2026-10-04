@@ -171,6 +171,7 @@ Self-healing is built in: tasks stuck past their 600 s soft timeout are reset (a
 | [Data sources](docs/data-sources.md) | URL templates, dedup keys, enrichment, RSS notes |
 | [LLM providers](docs/llm-providers.md) | Provider matrix, three-tier degradation, BYOK |
 | [Email delivery](docs/email-delivery.md) | Free-tier comparison, quota governance, anti-spam checklist |
+| **Setup guides** | [Getting an LLM API key](docs/guides/llm-api-key.md) · [Configuring email delivery & DNS](docs/guides/email-delivery-setup.md) — step-by-step for deployers |
 
 ## Known limitations
 

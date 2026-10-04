@@ -170,7 +170,8 @@ python -m app.cli run-once fetch|dispatch|digest|purge|revise [id]
 | [运维](docs/operations.md) | 巡检清单、故障对照表 |
 | [数据源](docs/data-sources.md) | URL 模板、去重键、补全逻辑、RSS 要点 |
 | [LLM 接入](docs/llm-providers.md) | 厂商矩阵、三级降级、BYOK |
-| [邮件投递](docs/email-delivery.md) | 免费额度对比、配额治理、反垃圾清单 |
+| [邮件投递](docs/email-delivery.md) | 免费额度对比、配额治理、反垃圾清单
+| **配置教程** | [获取 LLM API Key](docs/guides/llm-api-key.md) · [配置邮件通道与 DNS](docs/guides/email-delivery-setup.md) | |
 
 ## 已知限制
 

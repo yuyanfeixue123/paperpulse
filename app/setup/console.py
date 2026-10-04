@@ -268,7 +268,12 @@ def _step_llm() -> bool:
             warn("已取消")
             continue
 
-        base = ask("Base URL", default=_URL_OF.get(choice, ""), required=True)
+        url = _URL_OF.get(choice, "")
+        if url:
+            info(f"Base URL 默认 {url}（直接回车即可，不要填到 /chat/completions）")
+        else:
+            warn("请填写完整的 OpenAI 兼容端点，例如 http://127.0.0.1:11434/v1")
+        base = ask("Base URL", default=url, required=True)
         key = ask("API Key（不回显）", secret=True, required=True)
         model = ask("模型名", required=True)
 
@@ -328,6 +333,10 @@ def _step_mail() -> bool:
     from app.models.delivery import EmailProvider
     from app.setup import wizard
 
+    info("免费额度参考：Brevo 300 封/天（推荐）· Resend 100 封/天（无角标）· 阿里云按量")
+    info("端口对照：465=SSL · 587=STARTTLS · 25=明文（不推荐）")
+    warn("发信前必须在服务商控制台完成「发件人验证」，否则发信被拒")
+    print()
     kind = ask_choice("选择邮件通道", MAIL_PRESETS, default_idx=0)
     raw_preset: dict[str, Any] = dict(PRESETS[kind])
 
@@ -363,6 +372,7 @@ def _step_mail() -> bool:
         s.commit()
     ok(f"通道 {kind} 已保存")
 
+    info("如尚未配置 DNS，请先添加 SPF / DKIM / DMARC 三条记录，否则送达率会明显下降")
     target = ask("发送测试邮件到", required=True)
     from app.pipeline.deliver import send_test_email
 

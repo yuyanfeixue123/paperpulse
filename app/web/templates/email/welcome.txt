@@ -1,0 +1,46 @@
+{{ site_name }} — 订阅已创建
+========================================
+
+你好，订阅「{{ interest_name }}」已经启用。下面是本次配置的回执。
+
+{% if description %}兴趣描述
+--------
+{{ description }}
+{% endif %}
+推送设置
+--------
+推送时间    : {{ send_at }}（{{ timezone }}）
+首次推送    : {{ first_digest_at }}
+每日篇数    : 最多 {{ max_papers_per_day }} 篇（相关度 >= {{ min_score }}）
+回看窗口    : 最近 {{ lookback_days }} 天
+
+关注的主题
+--------
+{% for k in include_keywords %}{{ k }}
+{% else %}（未设置关键词，仅按相关度筛选）
+{% endfor %}
+{% if exclude_keywords %}
+已排除
+--------
+{% for k in exclude_keywords %}{{ k }}
+{% endfor %}
+{% endif %}
+验证邮箱
+--------
+确认这个邮箱能收到邮件：把下面的链接复制到浏览器打开即可。
+
+{{ verify_url }}
+
+没验证也能收信，但验证后我们才能保证退订与反馈链接始终可达。
+
+管理订阅
+--------
+修改关键词、推送时间或暂停推送：
+{{ manage_url }}
+
+管理全部订阅：
+{{ all_interests_url }}
+
+--
+这封邮件由 {{ site_name }} 自动发送，用于确认订阅配置。
+不想再收到创建通知？删除对应订阅即可。

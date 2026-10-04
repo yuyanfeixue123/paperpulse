@@ -128,6 +128,19 @@ def task_flush(_payload: dict) -> None:
     flush_deliveries()
 
 
+@register("send_welcome")
+def task_send_welcome(payload: dict) -> None:
+    """订阅创建后的确认邮件。失败只记日志，不影响订阅本身。"""
+    from app.pipeline.deliver import send_welcome_email
+
+    interest_id = int(payload["interest_id"])
+    ok, msg = send_welcome_email(interest_id)
+    if ok:
+        log.info("welcome.sent", interest=interest_id)
+    else:
+        log.warning("welcome.failed", interest=interest_id, reason=msg[:200])
+
+
 @register("build_digest")
 def task_build_digest(payload: dict) -> None:
     from app.pipeline.digest import build_digest

@@ -10,6 +10,34 @@
   <div class="card">
     <h1>4 · 邮件通道（必配）</h1>
     <div class="notice">无可用邮件通道将无法发送验证邮件与每日推送，此步不可跳过。</div>
+
+    <details class="help-box">
+      <summary style="cursor:pointer;font-weight:600">第一次配置邮件？这里有注册入口与 DNS 记录清单</summary>
+      <ol style="margin-top:12px">
+        <li>选一家服务商。Brevo 免费 <b>300 封/天</b>（约支撑 300 名活跃用户），是容量最大的免费选项。</li>
+        <li>注册并验证发件人账号（<b>不验证无法发信</b>）。</li>
+        <li>在发信子域上添加 DNS 记录：SPF、DKIM、DMARC（见下表）。</li>
+        <li>创建 API Key 或 SMTP 密码，填入下方表单。</li>
+        <li>下一步会<b>当场发一封测试邮件</b>，收到才算配好。</li>
+      </ol>
+      <table>
+        <tr><th>通道</th><th>入口</th><th>额度</th><th>角标</th></tr>
+        <tr><td>Brevo（推荐）</td><td><a href="https://www.brevo.com" target="_blank" rel="noopener">brevo.com</a></td><td>300 封/天</td><td>有</td></tr>
+        <tr><td>Resend</td><td><a href="https://resend.com" target="_blank" rel="noopener">resend.com</a></td><td>3000 封/月</td><td>无</td></tr>
+        <tr><td>阿里云 DirectMail</td><td><a href="https://dm.console.aliyun.com" target="_blank" rel="noopener">dm.console.aliyun.com</a></td><td>按量</td><td>无</td></tr>
+        <tr><td>AWS SES</td><td><a href="https://aws.amazon.com/ses/" target="_blank" rel="noopener">aws.amazon.com/ses</a></td><td>$0.10/1000</td><td>无</td></tr>
+      </table>
+      <p class="tip">
+        <b>阿里云 SMTP 参数</b>：服务器 <code>smtpdm.aliyun.com</code>，端口 <b>465（SSL）</b>，
+        用户名 = 完整发信地址（如 paper@mail.你的域名），密码在「账户中心 → SMTP 密码」设置。
+        25 端口是明文且云厂商 TOS 不鼓励，建议用 465。<br>
+        <b>DNS 记录</b>（以发信子域 <code>mail.你的域名</code> 为例）：
+        MX <code>mx01.dm.aliyun.com</code>（阿里云）；
+        TXT <code>v=spf1 include:spf1.dm.aliyun.com -all</code>；
+        TXT <code>_dmarc.mail.你的域名</code> → <code>v=DMARC1; p=none; rua=mailto:dmarc@你的域名</code>。
+        完整图文教程见仓库 <code>docs/guides/email-delivery-setup.md</code>。
+      </p>
+    </details>
     <form method="post" action="/admin/setup/4">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <div class="field">

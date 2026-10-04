@@ -6,6 +6,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 
 from app.core.db import SessionLocal
+from app.core.logging import get_logger
 from app.core.security import encrypt_value, hash_password, password_strength_ok
 from app.models.user import User
 from app.web.deps import check_csrf, csrf_for, login_required, must_user
@@ -13,6 +14,8 @@ from app.web.routes.admin_llm import VENDOR_PRESETS
 from app.web.templates import render
 
 router = APIRouter()
+
+log = get_logger("account")
 
 TIMEZONES = [
     "Asia/Shanghai", "Asia/Tokyo", "Asia/Singapore", "Europe/London",
@@ -85,6 +88,29 @@ def update_password(
         session.commit()
     _flash(request, "密码已更新", "ok")
     return RedirectResponse("/account", status_code=303)
+
+
+@router.get("/verify-email")
+def verify_email(request: Request, token: str = ""):
+    """确认邮件里的验证链接：把 email_verified 置 1。"""
+    from app.core.db import SessionLocal
+    from app.core.security import read_token
+    from app.core.utils import utc_iso
+    from app.models.user import User
+    from app.web.templates import render
+
+    data = read_token(token)
+    if not data or data.get("act") != "verify-email":
+        return render(request, "feedback/result.html", message="验证链接无效或已过期")
+    with SessionLocal() as s:
+        u = s.get(User, int(data["uid"]))
+        if u is None:
+            return render(request, "feedback/result.html", message="账号不存在")
+        u.email_verified = True
+        s.add(u)
+        s.commit()
+    log.info("account.email_verified", uid=int(data["uid"]), at=utc_iso())
+    return render(request, "feedback/result.html", message="邮箱验证成功，感谢确认")
 
 
 @router.get("/account/llm")

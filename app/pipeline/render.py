@@ -60,6 +60,51 @@ def render_digest(
     return subject, html, text
 
 
+def render_welcome(
+    *,
+    site_url: str,
+    site_name: str,
+    interest_name: str,
+    description: str,
+    include_keywords: list[str],
+    exclude_keywords: list[str],
+    send_at: str,
+    timezone: str,
+    lookback_days: int,
+    max_papers_per_day: int,
+    min_score: int,
+    first_digest_at: str,
+    user_id: int,
+    interest_id: int,
+) -> tuple[str, str, str]:
+    """订阅创建成功后的确认邮件。
+
+    同时承担邮箱验证职责：正文里的确认链接会把 users.email_verified 置 1。
+    """
+    verify_token = make_token(uid=user_id, act="verify-email", iid=interest_id)
+    ctx = {
+        "site_name": site_name,
+        "site_url": site_url,
+        "interest_name": interest_name,
+        "description": description,
+        "include_keywords": include_keywords,
+        "exclude_keywords": exclude_keywords,
+        "send_at": send_at,
+        "timezone": timezone,
+        "lookback_days": lookback_days,
+        "max_papers_per_day": max_papers_per_day,
+        "min_score": min_score,
+        "first_digest_at": first_digest_at,
+        "verify_url": f"{site_url.rstrip('/')}/verify-email?token={verify_token}",
+        "manage_url": f"{site_url.rstrip('/')}/interests/{interest_id}",
+        "all_interests_url": f"{site_url.rstrip('/')}/interests",
+    }
+    subject = f"[{site_name}] 订阅已创建：{interest_name}"
+    html = render_string("email/welcome.html", **ctx)
+    text = render_string("email/welcome.txt", **ctx)
+    return subject, html, text
+
+
 def render_verification(site_url: str, site_name: str, token: str) -> tuple[str, str, str]:
     url = f"{site_url.rstrip('/')}/verify?token={token}"
     subject = f"[{site_name}] 请验证你的邮箱"

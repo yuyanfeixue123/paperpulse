@@ -1,0 +1,184 @@
+# 配置邮件通道（管理员必读）
+
+**邮件是必配项。** 没有它，用户收不到邮箱验证信，也收不到每日摘要。
+
+- 部署者配置一次 → 全站用户开箱即用
+- 用户不能自行配置邮件通道（发信域名属于站点，密钥归站点）
+
+---
+
+## 一、怎么选通道
+
+| 通道 | 日额度 | 角标 | 适合 | 注册地址 |
+|---|---|---|---|---|
+| **Brevo**（原 Sendinblue） | **300 封/天** | 有 "Sent with Brevo" | 永久免费，容量最大 | [brevo.com](https://www.brevo.com) |
+| **Resend** | 3000 封/月（≈100/天） | **无** | 想要品牌干净 | [resend.com](https://resend.com) |
+| **AWS SES** | 按量 $0.10/1000 | 无 | 日发送量大时扩容 | [aws.amazon.com/ses](https://aws.amazon.com/ses/) |
+| **阿里云 DirectMail** | 按量，国内 | 无 | 已在用阿里云 | [dm.console.aliyun.com](https://dm.console.aliyun.com) |
+| 自建 SMTP | 取决于服务商 | 取决于服务商 | 已有邮件系统 | — |
+| 本机 Postfix | 取决于 IP 信誉 | 无 | **不建议，见文末** | — |
+
+**换算**：本应用的日发信量 = 活跃用户数（每人每天 1 封）。Brevo 免费版 300 封/天 ≈ 支撑 **300 名活跃用户**。
+
+超过 300 人后接 AWS SES，约 3000 封/月 ≈ $0.30。
+
+---
+
+## 二、Brevo 完整流程（推荐）
+
+1. 注册 [brevo.com](https://www.brevo.com)，**邮箱验证**
+2. 首页按引导创建**发件人账号（Senders）**
+   - 邮箱填 `paper@你的域名`
+   - **关键**：必须完成验证，否则发信被拒
+3. 左侧「Transactional / Email」→ **API Keys** → 生成
+   - `api_key` 复制保存（只显示一次）
+4. 记录你的账号 ID（界面右上角头像旁，形如 `x0000000`），Brevo 部分接口需要
+
+### 域名验证（强烈建议）
+
+不发验证也能发，但送达率明显差。Brevo 控制台的「域名认证」会给出三或两条 DNS 记录：
+
+| 类型 | 主机名 | 指向 |
+|---|---|---|
+| SPF（`TXT`） | 发信子域，如 `mail.你的域名` | `v=spf1 include:spf1.brevo.com -all` |
+| DKIM（`CNAME`） | 随机串.`_domainkey.发信子域` | 面板给出的目标 |
+
+加上后 24–72 小时生效。**建议同时加 DMARC**：
+
+```
+类型：TXT    主机名：_dmarc.发信子域    值：v=DMARC1; p=none; rua=mailto:dmarc@你的域名
+```
+
+先用 `p=none` 观察，确认没有伪造来源再收紧到 `p=quarantine`。
+
+---
+
+## 三、Resend 流程
+
+1. 注册 [resend.com](https://resend.com)
+2. 「Domains」→ Add Domain，填你的发信子域（如 `mail.example.com`）
+3. 按提示添加 DNS 记录（Resend 会给 DKIM 与 SPF 的具体值）
+4. 「API Keys」→ Create API Key → 复制 `re_...`
+5. 记下发信地址（Resend 默认只允许 `onboarding@resend.dev`，需在 Domains 里验证自己的域名后才能发任意地址）
+
+---
+
+## 四、阿里云 DirectMail 流程（国内推荐）
+
+1. 登录 [dm.console.aliyun.com](https://dm.console.aliyun.com)，开通邮件推送
+2. 左侧「**邮件域**」→ 添加发信域名（如 `mail.你的域名`）
+3. 域名验证：添加页面给出的 **CNAME** 记录（阿里云用 CNAME 而非 TXT 验 DKIM）
+4. 左侧「**发信地址**」→ 添加发信地址 `paper@你的域名`
+5. 左侧「**账户中心 → SMTP 密码**」→ 设置 SMTP 密码
+
+### SMTP 参数
+
+| 项 | 值 |
+|---|---|
+| 服务器 | `smtpdm.aliyun.com` |
+| 端口 | **465（SSL，推荐）** / 25（明文，不建议） |
+| 加密 | 465 用隐式 SSL；25 无加密 |
+| 用户名 | 完整发信地址，如 `paper@mail.你的域名` |
+| 密码 | 上一步设置的 SMTP 密码 |
+
+> **为什么选 465 而不是 25**：25 端口是明文传输，且阿里云等云厂商的 TOS 不鼓励云服务器直接走 25。
+> 实测 465 在国内服务器上完全可用，优先用它。
+
+### 阿里云 DNS 记录
+
+| 类型 | 主机名 | 值 |
+|---|---|---|
+| MX（优先级 999） | 发信子域 | `mx01.dm.aliyun.com` |
+| TXT（SPF） | 发信子域 | `v=spf1 include:spf1.dm.aliyun.com -all` |
+| TXT（DMARC） | `_dmarc.` + 发信子域 | `v=DMARC1; p=none; rua=mailto:dmarc@你的域名` |
+| TXT（回退 SPF） | 发信子域 | `v=spf1 include:spf1.dm.aliyun.com ~all` |
+
+邮件发信不需要 `A` 记录。
+
+---
+
+## 五、填进 PaperPulse
+
+### 方式 A：首次部署向导
+
+```bash
+sudo -u paperpulse -H /opt/paperpulse/.venv/bin/python -m app.cli setup
+```
+
+走到「4 邮件通道」，选通道类型，依次填写发信地址、凭据、主机、端口。
+向导会**当场发一封测试邮件**给你填的收件地址，收到才让你继续。
+
+### 方式 B：后台随时改
+
+「后台 → 邮件」，填完点「发送测试邮件」。
+
+### 端口与加密的对应
+
+| 端口 | `use_ssl` | `use_tls` | 说明 |
+|---|---|---|---|
+| 465 | `true` | `false` | 隐式 SSL，阿里云 / Gmail / QQ 邮箱 |
+| 587 | `false` | `true` | STARTTLS，Brevo / SendGrid / SES |
+| 25 | `false` | `false` | 明文，**不推荐** |
+
+---
+
+## 六、日配额治理
+
+免费额度的硬约束是**日上限**，超限会被服务商直接停发。PaperPulse 的做法：
+
+1. 后台给每条通道设 `daily_budget`，**默认 250**（Brevo 上限 300，留 50 封缓冲给验证码与重试）
+2. 发送前对当日计数做**原子预占**
+3. 预占失败 → 该邮件标 `deferred`，**次日自动补发**，不静默丢弃
+4. 后台「邮件」页实时显示：今日已发 / 额度 / 剩余 / 顺延队列
+
+用户数接近免费上限时，在后台把 `daily_budget` 调低，或加一条备用通道。
+
+---
+
+## 七、反垃圾必做项
+
+DNS 记录之外，还要确保：
+
+1. **`multipart/alternative`** — 必须同时有纯文本版本（PaperPulse 已内置）
+2. **正文链接指向同域跳转** — PaperPulse 的反馈/退订链接都走你的站点域名
+3. **不要在正文堆外链** — 短链服务会显著拉低送达率
+4. **固定发信节奏** — 每天同一时刻集中发送，别随机撒
+5. **新域名先预热** — 首周每天 ≤20 封，逐周翻倍
+6. **带上 `List-Unsubscribe`** — PaperPulse 已自动加（RFC 8058），别手工删掉
+
+---
+
+## 八、验证是否配置成功
+
+```bash
+# 1. 后台点「发送测试邮件」，填你自己的收件地址
+# 2. 收到后检查原始邮件头，确认这三项：
+#    - DKIM-Signature   （签名）
+#    - SPF: pass
+#    - DMARC: pass
+```
+
+命令行查看邮件头：在邮件客户端里点「显示原始邮件」（Gmail：右上角 ⋮ → 显示原始邮件）。
+
+三头全 pass 才是真正配好了。只看到 `SPF: pass` 而没有 DKIM，说明域名验证没做完。
+
+---
+
+## 九、不要用服务器直发
+
+PaperPulse 保留了 Postfix 直发通道，但**默认关闭且不建议启用**：
+
+- 阿里云 / 腾讯云的 25 端口解封协议明确要求「仅可用于连接第三方 SMTP 服务器」，
+  用该 IP 直接对外发信，**服务商有权永久封禁端口**
+- 新 IP 无历史声誉，Gmail / Outlook 投递率不可保证
+- 需要静态 IP + 可自助设置的 PTR + 不在黑名单里
+
+第三方免费额度已经能撑 300 用户，直发带来的收益远小于风险。
+
+---
+
+## 相关文档
+
+- [邮件投递总览](../email-delivery.md) — 通道对比、配额治理、可靠性设计
+- [获取 LLM API Key](llm-api-key.md) — 另一项必配的部署者凭据
+- [部署手册](../deployment.md) — 完整裸机部署流程

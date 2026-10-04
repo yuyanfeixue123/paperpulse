@@ -333,3 +333,102 @@ def test_llm_ready_with_user_byok(db):
     assert creds.base_url == "https://api.deepseek.com/v1"
     assert creds.api_key == "sk-user-own"  # 解密后可用
     reload_settings()
+
+
+def test_welcome_email_renders_config_echo(db):
+    """订阅创建后的确认邮件应回显配置，便于用户核对。"""
+    from app.pipeline.render import render_welcome
+
+    subject, html, text = render_welcome(
+        site_url="https://example.com",
+        site_name="PaperPulse",
+        interest_name="城市感知",
+        description="关注街景与建成环境",
+        include_keywords=["街景图像", "street view"],
+        exclude_keywords=["医学分割"],
+        send_at="08:30",
+        timezone="Asia/Shanghai",
+        lookback_days=7,
+        max_papers_per_day=8,
+        min_score=4,
+        first_digest_at="2026-10-05T00:30:00+00:00",
+        user_id=1,
+        interest_id=2,
+    )
+    assert "城市感知" in subject and "PaperPulse" in subject
+    assert "街景图像" in html and "street view" in html
+    assert "医学分割" in html
+    assert "08:30" in html and "Asia/Shanghai" in html
+    assert "08:30" in text and "街景图像" in text
+    assert "/verify-email?token=" in html
+    assert "multipart" not in html  # 模板本身不该声明 multipart
+
+
+def test_welcome_email_handles_empty_lists(db):
+    from app.pipeline.render import render_welcome
+
+    _, html, text = render_welcome(
+        site_url="https://example.com",
+        site_name="PP",
+        interest_name="空关键词",
+        description="",
+        include_keywords=[],
+        exclude_keywords=[],
+        send_at="09:00",
+        timezone="UTC",
+        lookback_days=3,
+        max_papers_per_day=5,
+        min_score=3,
+        first_digest_at="2026-10-05T09:00:00+00:00",
+        user_id=1,
+        interest_id=1,
+    )
+    assert "未设置关键词" in html
+    assert "空关键词" in text
+
+
+def test_send_welcome_requires_existing_interest(db):
+    from app.pipeline.deliver import send_welcome_email
+
+    ok, msg = send_welcome_email(999999)
+    assert ok is False and "不存在" in msg
+
+
+def test_verify_email_route_rejects_bad_token(db):
+    _complete_setup()
+    c = _client()
+    r = c.get("/verify-email?token=forged.token")
+    assert r.status_code == 200
+    assert "无效" in r.text or "过期" in r.text
+
+
+def test_verify_email_marks_user(db):
+    from app.core.security import make_token
+    from app.models.user import User
+
+    _complete_setup()
+    with db() as s:
+        s.add(
+            User(
+                email="verify-me@example.com",
+                password_hash="x",
+                email_verified=False,
+                created_at=utc_iso(),
+            )
+        )
+        s.commit()
+        uid = int(s.query(User).filter(User.email == "verify-me@example.com").one().id)
+
+    c = _client()
+    token = make_token(uid=uid, act="verify-email", iid=1)
+    r = c.get(f"/verify-email?token={token}")
+    assert r.status_code == 200
+    assert "验证成功" in r.text
+    with db() as s:
+        assert s.get(User, uid).email_verified is True
+
+
+def test_welcome_task_is_registered():
+    from app.scheduler.runner import HANDLERS
+
+    assert "send_welcome" in HANDLERS

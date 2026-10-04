@@ -11,6 +11,35 @@
     <h1>3 · LLM 接入</h1>
     <p class="small muted">用于兴趣解析与论文精排。若暂不配置，可显式选择「纯关键词模式」降级启用。</p>
 
+    <details class="help-box">
+      <summary style="cursor:pointer;font-weight:600">第一次配置？这里有完整教程（含各厂商入口与免费额度）</summary>
+      <ol style="margin-top:12px">
+        <li>选一家厂商。国内服务器建议用能直连的：
+            <a href="https://platform.deepseek.com" target="_blank" rel="noopener">DeepSeek</a>（推荐）·
+            <a href="https://bailian.console.aliyun.com" target="_blank" rel="noopener">通义千问</a>·
+            <a href="https://open.bigmodel.cn" target="_blank" rel="noopener">智谱 GLM</a>·
+            <a href="https://platform.moonshot.cn" target="_blank" rel="noopener">Moonshot</a></li>
+        <li>注册 → 实名认证 → 领赠额或充值（多数厂商新用户有赠额）。</li>
+        <li>在控制台的「API Keys」页创建密钥，<b>只显示一次，立刻复制</b>。</li>
+        <li>粘贴到下方表单，点「保存并测试连接」——通过才会进入下一步。</li>
+      </ol>
+      <table>
+        <tr><th>厂商</th><th>Base URL（填到 /v1 为止）</th><th>建议模型</th></tr>
+        <tr><td>DeepSeek</td><td><code>https://api.deepseek.com/v1</code></td><td>deepseek-flash / deepseek-chat</td></tr>
+        <tr><td>通义千问</td><td><code>https://dashscope.aliyuncs.com/compatible-mode/v1</code></td><td>qwen-turbo / qwen-plus</td></tr>
+        <tr><td>智谱 GLM</td><td><code>https://open.bigmodel.cn/api/paas/v4</code></td><td>glm-4-flash</td></tr>
+        <tr><td>Moonshot</td><td><code>https://api.moonshot.cn/v1</code></td><td>moonshot-v1-8k</td></tr>
+        <tr><td>硅基流动</td><td><code>https://api.siliconflow.cn/v1</code></td><td>Qwen/Qwen2.5-7B-Instruct</td></tr>
+        <tr><td>OpenAI</td><td><code>https://api.openai.com/v1</code></td><td>gpt-4o-mini</td></tr>
+      </table>
+      <p class="tip">
+        <b>Base URL 不要填到 /chat/completions</b>，程序会自己拼。任意 OpenAI 兼容端点
+        （vLLM、LM Studio、OneAPI 等）同样适用。<br>
+        不想配置就点下面的「纯关键词模式」——但中文描述的召回会明显受限。
+        完整图文教程见仓库 <code>docs/guides/llm-api-key.md</code>。
+      </p>
+    </details>
+
     <form method="post" action="/admin/setup/3" id="llmForm">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="mode" id="mode" value="llm">
