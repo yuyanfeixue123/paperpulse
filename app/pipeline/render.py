@@ -37,7 +37,12 @@ def render_digest(
     其余转为「未通过邮件通道送达」的提示，引导用户登录站内查看完整列表。
     """
     from app.core.utils import truncate
-    from app.pipeline.curation import split_for_email
+    from app.pipeline.curation import context_matches, split_for_email
+
+    # 订阅名本身也是邮件正文的一部分。用户自取的订阅名若含通道不便展示的词汇，
+    # 无论论文是否过滤都会被整封拒收 —— 这里改用中性名称，并在邮件里说明。
+    name_softened = context_matches(interest_name) is not None
+    shown_name = "你的订阅" if name_softened else interest_name
 
     emailable, withheld = split_for_email(items)
     if emailable:
@@ -67,7 +72,8 @@ def render_digest(
     ctx = {
         "site_name": site_name,
         "site_url": site_url,
-        "interest_name": interest_name,
+        "interest_name": shown_name,
+        "interest_name_softened": name_softened,
         "digest_date": digest_date,
         "salutation": salutation or "你好",
         "lookback_days": lookback_days,
@@ -78,7 +84,7 @@ def render_digest(
         "unsub_url": one_click_unsubscribe_url(site_url, user_id, interest_id),
         "keyword_mode": keyword_mode,
     }
-    subject = f"[{site_name}] {interest_name} · {digest_date} · {len(items)} 篇"
+    subject = f"[{site_name}] {shown_name} · {digest_date} · {len(items)} 篇"
     html = render_string("email/digest.html", **ctx)
     text = render_string("email/digest.txt", **ctx)
     return subject, html, text

@@ -62,6 +62,22 @@ def is_emailable(item: dict[str, Any]) -> bool:
     return matched_pattern(item) is None
 
 
+def context_matches(*texts: str | None) -> str | None:
+    """检查邮件里其他用户自定义文本（订阅名、描述等）。
+
+    订阅名会出现在标题、问候语与退订文案里，是邮件正文的一部分 ——
+    只过滤论文标题是不够的：用户若把敏感词写进订阅名，整封信仍会被通道拒收。
+    命中时不应静默改写用户输入，而是用中性名称替代并在邮件里说明。
+    """
+    blob = " ".join(str(t or "") for t in texts)
+    if not blob.strip():
+        return None
+    for pat in _patterns():
+        if pat.search(blob):
+            return pat.pattern
+    return None
+
+
 def split_for_email(items: list[dict[str, Any]]) -> tuple[list[dict], list[dict]]:
     """把条目分成（可进邮件的，其余仅站内）。顺序保持不变。"""
     emailable: list[dict] = []

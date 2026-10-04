@@ -192,3 +192,63 @@ def test_all_items_filtered_does_not_contradict_itself():
     assert total == shown + held, f"{total} != {shown} + {held}"
     assert total == 2 and shown == 1 and held == 1
     reload_settings()
+
+
+def test_jsonl_output_is_parsed():
+    """回归：DeepSeek 等端点只支持 json_object 时会返回 JSONL
+    （多个顶层对象串联、无外层数组），旧实现只取第一个片段，
+    解析抛 'Extra data' 导致打分整批失败。"""
+    from app.llm.base import parse_json_loose
+
+    assert parse_json_loose('{"id":"1","score":3}') == {"id": "1", "score": 3}
+    assert parse_json_loose('[{"id":"1"},{"id":"2"}]') == [{"id": "1"}, {"id": "2"}]
+    got = parse_json_loose('{"id":"1","score":3},{"id":"2","score":4},{"id":"3","score":5}')
+    assert got == [{"id": "1", "score": 3}, {"id": "2", "score": 4}, {"id": "3", "score": 5}]
+    # 换行分隔的 JSONL
+    assert len(parse_json_loose('{"a":1}\n{"a":2}')) == 2
+
+
+def test_interest_name_also_subject_to_filter():
+    """回归：订阅名会出现在邮件标题、问候语与退订文案里。
+    只过滤论文标题不够 —— 用户把敏感词写进订阅名，整封信仍会被通道拒收。"""
+    from app.pipeline.curation import context_matches
+
+    reload_settings({"email": {"content_filter_patterns": [r"跨性别"]}})
+    assert context_matches("LLM 与跨性别研究") == "跨性别"
+    assert context_matches("城市规划与 LLM") is None
+    assert context_matches(None, "") is None
+    reload_settings()
+
+
+def test_digest_email_neutralizes_sensitive_interest_name():
+    """订阅名命中过滤规则时：正文用中性名 + 明确说明，而非静默改写。"""
+    from app.pipeline.render import render_digest
+
+    reload_settings({"email": {"content_filter_patterns": [r"跨性别"]}})
+    subject, html, text = render_digest(
+        site_url="https://pp.example.com", site_name="PP",
+        interest_name="LLM 个体使用、跨性别研究与城乡规划",
+        digest_date="2026-10-04", items=[], user_id=1, interest_id=1,
+    )
+    assert "跨性别" not in subject
+    assert "跨性别" not in html
+    assert "跨性别" not in text
+    assert "你的订阅" in html
+    assert "不便展示的词汇" in html and "不便展示的词汇" in text
+    # 站内入口仍要能拿到完整列表
+    assert "https://pp.example.com/feed" in html
+    reload_settings()
+
+
+def test_digest_email_keeps_normal_interest_name():
+    from app.pipeline.render import render_digest
+
+    reload_settings({"email": {"content_filter_patterns": [r"跨性别"]}})
+    subject, html, _ = render_digest(
+        site_url="https://pp.example.com", site_name="PP",
+        interest_name="城乡规划与 LLM", digest_date="2026-10-04",
+        items=[], user_id=1, interest_id=1,
+    )
+    assert "城乡规划与 LLM" in subject and "城乡规划与 LLM" in html
+    assert "不便展示的词汇" not in html
+    reload_settings()

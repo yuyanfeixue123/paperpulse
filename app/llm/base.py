@@ -59,20 +59,50 @@ _FIRST_OBJ = re.compile(r"(\{.*\}|\[.*\])", re.S)
 
 
 def parse_json_loose(content: str) -> Any:
-    """服务端容错解析：去围栏、取首个 JSON 片段、修尾逗号。解析失败抛 LLMError。"""
+    """服务端容错解析。
+
+    要处理的实测形态（DeepSeek 等只支持 json_object 的端点）：
+      - 标准 JSON：``{"results": [...]}`` / ``[{...}, {...}]``
+      - **JSONL**：``{"id":"1",...},{"id":"2",...}`` 多个顶层值串联，无外层数组
+      - 带 ```json 围栏
+      - 尾逗号
+
+    单个值直接返回；多个顶层值合并为列表返回。
+    """
     text = (content or "").strip()
     m = _JSON_BLOCK.search(text)
     if m:
         text = m.group(1).strip()
-    else:
-        m2 = _FIRST_OBJ.search(text)
-        if m2:
-            text = m2.group(1).strip()
     text = re.sub(r",\s*([}\]])", r"\1", text)
-    try:
-        return json.loads(text)
-    except Exception as exc:
-        raise LLMError(f"无法解析模型输出：{exc}; 原文前 200 字：{text[:200]}") from exc
+
+    # 模型可能在 JSON 前后加了解释文字，从第一个 { 或 [ 开始
+    start = min(
+        (i for i in (text.find("{"), text.find("[")) if i >= 0),
+        default=0,
+    )
+
+    decoder = json.JSONDecoder()
+    values: list[Any] = []
+    idx = start
+    while idx < len(text):
+        while idx < len(text) and text[idx] in " \t\r\n,;":
+            idx += 1
+        if idx >= len(text):
+            break
+        try:
+            value, end = decoder.raw_decode(text, idx)
+        except ValueError as exc:
+            if not values:
+                raise LLMError(
+                    f"无法解析模型输出：{exc}; 原文前 200 字：{text[:200]}"
+                ) from exc
+            break  # 尾部有无法解析的残余，放弃已解析的部分
+        values.append(value)
+        idx = end
+
+    if not values:
+        raise LLMError(f"模型输出为空；原文前 200 字：{text[:200]}")
+    return values[0] if len(values) == 1 else values
 
 
 def extract_usage(data: dict) -> Usage:

@@ -16,6 +16,20 @@
       你的选择会直接影响明天的推送。
     </p>
 
+    {% if interest_name_softened %}
+      <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;padding:10px 14px;margin:0 0 16px;font-size:13px;color:#5b21b6">
+        你给这个订阅起的名字包含本邮件通道不便展示的词汇，邮件中以通用名称代替。
+        <a href="{{ feed_url }}" style="color:#5b21b6">在站内查看完整名称与全部推荐 →</a>
+      </div>
+    {% endif %}
+
+    {% if interest_name_softened %}
+      <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;padding:10px 14px;margin:0 0 16px;font-size:13px;color:#5b21b6">
+        你给这个订阅起的名字包含本邮件通道不便展示的词汇，邮件中以通用名称代替。
+        <a href="{{ feed_url }}" style="color:#5b21b6">在站内查看完整名称与全部推荐 →</a>
+      </div>
+    {% endif %}
+
     {% if keyword_mode %}
       <div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:8px 12px;border-radius:6px;margin-bottom:16px;font-size:13px">
         本次未启用 AI 精排（关键词模式）。
