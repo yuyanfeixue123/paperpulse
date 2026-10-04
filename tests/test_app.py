@@ -330,6 +330,23 @@ def test_guard_task_runs(db):
     task_guard({})  # 不抛异常即通过
 
 
+def _set_llm_mode(mode: str) -> None:
+    """把 system_settings.llm_mode 显式设为指定模式。
+
+    `llm_ready` 现在会先看系统模式：关键词模式下直接放行（该模式不需要
+    LLM，强制要求配 Key 与其设计初衷矛盾）。测试库的 llm_mode 默认是
+    keyword，所以测「LLM 模式下的门禁」时必须显式声明，否则前提不成立。
+    """
+    from app.core.db import SessionLocal
+    from app.models.system import SystemSettings
+
+    with SessionLocal() as s:
+        row = s.get(SystemSettings, 1)
+        if row is not None:
+            row.llm_mode = mode
+            s.commit()
+
+
 def test_llm_gate_blocks_interest_creation(db):
     """未配置任何 LLM 凭据时，创建订阅的三个入口都应重定向到配置页。"""
 
@@ -339,6 +356,7 @@ def test_llm_gate_blocks_interest_creation(db):
     from app.models.user import User
 
     reload_settings({"llm": {"base_url": "", "api_key": ""}})
+    _set_llm_mode("llm")  # 本用例测的是 LLM 模式下的门禁
     with db() as s:
         u = s.query(User).filter(User.email == "gate@example.com").first()
         if u is None:
@@ -386,12 +404,32 @@ def test_llm_ready_with_global_config(db):
     from app.core.config import reload_settings
     from app.llm.client import llm_ready
 
+    _set_llm_mode("llm")
     reload_settings({"llm": {"base_url": "https://x.test/v1", "api_key": "k"}})
     assert llm_ready(None)[0] is True
     assert llm_ready(1)[0] is True
 
     reload_settings({"llm": {"base_url": "", "api_key": ""}})
     assert llm_ready(None)[0] is False
+
+
+def test_llm_ready_allows_keyword_mode(db):
+    """回归：关键词模式下不该强制用户配 LLM Key。
+
+    该模式是引导第 3 步的一等选项，parse_interest 有完整的本地分词路径。
+    此前 llm_ready 只看凭据，部署者选了「不用 LLM」却仍被要求必须有 LLM
+    才能建订阅 —— 与模式本身的存在矛盾。
+    """
+    from app.core.config import reload_settings
+    from app.llm.client import llm_ready
+
+    _set_llm_mode("keyword")
+    reload_settings({"llm": {"base_url": "", "api_key": ""}})
+    try:
+        assert llm_ready(None)[0] is True
+        assert llm_ready(1)[0] is True
+    finally:
+        _set_llm_mode("llm")
 
 
 def test_llm_ready_with_user_byok(db):

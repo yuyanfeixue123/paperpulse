@@ -76,13 +76,44 @@ def resolve_credentials(user_id: int | None = None) -> Credentials:
 
 
 def llm_ready(user_id: int | None = None) -> tuple[bool, str]:
-    """是否可以进行需要 LLM 的操作。返回 (是否就绪, 未就绪原因)。"""
+    """是否可以进行需要 LLM 的操作。返回 (是否就绪, 未就绪原因)。
+
+    关键词模式下**直接放行**：该模式是引导第 3 步的一等选项，
+    `parse_interest` 也有完整的本地分词降级路径（keyword_fallback）。
+    此时强制用户去配 API Key 与模式的设计初衷直接矛盾 —— 部署者选了
+    「不用 LLM」，却仍被要求必须有 LLM 才能建订阅。
+
+    注意：放行的是**闸门**，不是调用。真正的调用点 `complete_json` 仍会
+    检查 `llm.provider == "keyword"` 并抛错，所以放行不会导致误调 LLM。
+    """
+    if system_llm_mode() == "keyword":
+        return True, ""
     creds = resolve_credentials(user_id)
     if creds.configured:
         return True, ""
     if user_id is None:
         return False, "系统尚未配置 LLM 凭据，请联系管理员"
     return False, "需要先配置 LLM API Key 才能创建订阅"
+
+
+def system_llm_mode() -> str:
+    """系统当前的 LLM 模式：读数据库里的 llm_mode，回落到配置的 provider。
+
+    两个来源都要看：引导第 3 步把 `system_settings.llm_mode` 设为 keyword，
+    而配置文件里的 `llm.provider` 也可能是 keyword。只看其一会漏判 ——
+    只看 provider 会让「后台切到关键词模式但配置未改」的情况失准。
+    """
+    try:
+        from app.core.db import SessionLocal as _S
+        from app.models.system import SystemSettings as _SS
+
+        with _S() as session:
+            row = session.get(_SS, 1)
+            if row is not None and row.llm_mode:
+                return row.llm_mode
+    except Exception:  # noqa: BLE001 读库失败不该让闸门崩掉
+        log.warning("llm.mode_read_failed")
+    return get_settings().llm.provider or "keyword"
 
 
 def _record_usage(
@@ -139,7 +170,12 @@ def complete_json(
     """
     settings = get_settings()
     creds = resolve_credentials(user_id)
-    if settings.llm.provider == "keyword" or not creds.configured:
+    if system_llm_mode() == "keyword":
+        # 关键词模式下调用方应走各自的降级路径（如 parse_interest 的
+        # keyword_fallback），而不是撞到这里。消息要说清是哪一种情况，
+        # 否则用户会以为是自己 Key 没配好。
+        raise LLMError("系统运行在关键词模式，不调用 LLM")
+    if not creds.configured:
         raise LLMError("未配置 LLM 凭据")
 
     # 每用户日配额闸门。放在这里而不是各调用点，是因为本函数是

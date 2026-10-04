@@ -167,6 +167,32 @@ def task_build_digest(payload: dict) -> None:
     build_digest(int(payload["interest_id"]), payload.get("date", ""))
 
 
+@register("recommend_now")
+def task_recommend_now(payload: dict) -> None:
+    """网页「立刻推荐」的异步执行体。
+
+    为什么入队而不是在请求里同步跑：每个订阅要跑召回 + LLM 批量打分，
+    多订阅用户点一下会卡住浏览器几分钟 —— 必然触发网关超时，
+    且用户会连点、重复触发。这里只把任务丢给队列，页面轮询结果。
+    """
+    from app.core.logging import get_logger as _log
+    from app.pipeline.digest import build_digest
+
+    uid = int(payload.get("user_id", 0))
+    ids = [int(i) for i in payload.get("interest_ids", [])]
+    built = 0
+    for interest_id in ids:
+        try:
+            # rebuild=True：重算当日摘要，但不入队邮件
+            if build_digest(interest_id, rebuild=True) is not None:
+                built += 1
+        except Exception as exc:  # noqa: BLE001 单个失败不中断其余
+            _log().warning(
+                "recommend.failed", interest=interest_id, error=str(exc)[:200]
+            )
+    log.info("recommend.done", user=uid, built=built, total=len(ids))
+
+
 def run_once(task: str, arg: str = "") -> int:
     """CLI run-once。"""
     mapping: dict[str, tuple[str, dict[str, Any]]] = {

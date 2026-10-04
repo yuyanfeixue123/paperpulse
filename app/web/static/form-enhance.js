@@ -110,4 +110,36 @@ document.addEventListener('DOMContentLoaded', function () {
     setupKeywordPicker('#inc-kw', document.getElementById('inc-kw-picker'), presets);
     setupKeywordPicker('#exc-kw', document.getElementById('exc-kw-picker'), presets.slice(0, 24));
   }
+
+  setupBusySubmit();
 });
+
+/**
+ * 慢操作的「提交中」状态。
+ *
+ * AI 编辑订阅、立刻推荐这类操作从秒级到分钟级，按钮不禁用的话用户
+ * 一定会连点 —— 轻则重复提交，重则撞上重复扣配额。
+ *
+ * 只处理 `data-busy` 标注的表单：普通表单（评分、删除）瞬时完成，
+ * 加禁用反而会让用户以为点击失败。
+ */
+function setupBusySubmit() {
+  document.addEventListener('submit', function (ev) {
+    const form = ev.target;
+    if (!form || !form.matches || !form.matches('form[data-busy]')) return;
+    // 已提交过就不再拦第二次（比如用户取消后想重试）
+    if (form.dataset.busyLocked === '1') {
+      ev.preventDefault();
+      return;
+    }
+    form.dataset.busyLocked = '1';
+    const buttons = form.querySelectorAll('button[type=submit]');
+    buttons.forEach(function (b) {
+      b.disabled = true;
+      if (!b.dataset.busyText) {
+        b.dataset.busyText = b.textContent;
+        b.textContent = form.dataset.busy;
+      }
+    });
+  }, true);
+}

@@ -8,8 +8,15 @@ from fastapi.responses import RedirectResponse
 from app.core.db import SessionLocal
 from app.core.logging import get_logger
 from app.core.security import encrypt_value, hash_password, password_strength_ok
+from app.core.utils import utc_iso
 from app.models.user import User
-from app.web.deps import check_csrf, csrf_for, login_required, must_user
+from app.web.deps import (
+    check_csrf,
+    csrf_for,
+    login_required,
+    must_user,
+    set_session,
+)
 from app.web.routes.admin_llm import VENDOR_PRESETS
 from app.web.templates import render
 
@@ -67,6 +74,7 @@ def update_profile(
     user = must_user(request)
     uname = username.strip() or None
     new_email = email.strip().lower()
+    email_changed = False
     with SessionLocal() as session:
         u = session.get(User, int(user.id))
         if uname:
@@ -85,10 +93,34 @@ def update_profile(
                 return RedirectResponse("/account", status_code=303)
             u.email = new_email
             u.email_verified = False  # 换邮箱需重新验证
+            email_changed = True
         u.username = uname
         u.display_name = display_name.strip() or (uname or u.email.split("@")[0])
         u.timezone = timezone
+        session.add(u)
         session.commit()
+        uid = int(u.id)
+
+    if email_changed:
+        # 换邮箱后必须重发验证邮件：把 email_verified 置 False 而不发信，
+        # 用户会永远卡在「未验证」且不知道该找谁重发。
+        try:
+            from app.core.security import make_token
+            from app.pipeline.deliver import send_verification_email
+
+            send_verification_email(new_email, make_token(uid=uid, act="verify"))
+            _flash(request, "资料已更新，验证邮件已发送到新邮箱", "ok")
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "account.email_change_verify_failed", uid=uid, error=str(exc)[:200]
+            )
+            _flash(
+                request,
+                f"资料已更新，但验证邮件发送失败：{exc}。请联系管理员协助重发。",
+                "error",
+            )
+        return RedirectResponse("/account", status_code=303)
+
     _flash(request, "资料已更新", "ok")
     return RedirectResponse("/account", status_code=303)
 
@@ -179,9 +211,19 @@ def update_password(
     with SessionLocal() as session:
         u = session.get(User, int(user.id))
         u.password_hash = hash_password(new_password)
+        # 改密时间戳编入会话 token：不更新它，旧会话在密码泄露后仍可用，
+        # 改密就失去了「把攻击者踢下线」的意义。SECURITY.md 承诺的
+        # 「改密后旧会话立即失效」依赖这一行。
+        u.password_changed_at = utc_iso()
+        session.add(u)
         session.commit()
-    _flash(request, "密码已更新", "ok")
-    return RedirectResponse("/account", status_code=303)
+    # 改密后**重新签发**当前会话：上面的时间戳变更会让本设备的旧 cookie
+    # 也一并失效，用户会被自己踢出登录。这里补一张新 cookie，
+    # 达成「其他设备全部登出、当前设备保持登录」。
+    _flash(request, "密码已更新，其他设备的登录状态已全部失效", "ok")
+    resp = RedirectResponse("/account", status_code=303)
+    set_session(resp, int(user.id), request)
+    return resp
 
 
 @router.get("/verify-email")
@@ -300,18 +342,37 @@ def update_byok(
     llm_model: str = Form(""),
     csrf: str = Form(""),
 ):
-    """可选：用户自带 LLM Key。留空则自动回落全局 Key。"""
+    """可选：用户自带 LLM Key。留空则自动回落全局 Key。
+
+    `llm_base_url` 会成为 LLM provider 的实际请求地址，因此**必须**做
+    SSRF 校验 —— 否则用户可把 base_url 指向内网地址，provider 会直接
+    POST {base_url}/chat/completions，形成盲 SSRF（响应内容不回显，
+    但可探测内网端口与服务存在性）。/account/llm 已有此校验，
+    这里是与之并存的第二条路径，此前遗漏。
+    """
     guard = login_required(request)
     if guard:
         return guard
     if not check_csrf(request, csrf):
         return RedirectResponse("/account", status_code=303)
     user = must_user(request)
+
+    base_url = llm_base_url.strip()
+    if base_url:
+        from app.core.urlguard import UnsafeURL, safe_base_url
+
+        try:
+            base_url = safe_base_url(base_url)
+        except UnsafeURL as exc:
+            _flash(request, f"接口地址被安全策略拒绝：{exc}", "error")
+            return RedirectResponse("/account", status_code=303)
+
     with SessionLocal() as session:
         u = session.get(User, int(user.id))
-        u.llm_base_url = llm_base_url.strip()
+        u.llm_base_url = base_url
         u.llm_api_key_enc = encrypt_value(llm_api_key.strip()) if llm_api_key.strip() else ""
         u.llm_model = llm_model.strip()
+        session.add(u)
         session.commit()
     _flash(request, "高级设置已保存（留空表示使用系统全局凭据）", "ok")
     return RedirectResponse("/account", status_code=303)

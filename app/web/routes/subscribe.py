@@ -186,9 +186,9 @@ def create_interest(
             source_keys_json=dumps(list(source_keys)),
             arxiv_categories_json=dumps(list(arxiv_categories)),
             queries_json=dumps(q),
-            min_score=int(min_score),
-            max_papers_per_day=int(max_papers_per_day),
-            lookback_days=int(lookback_days),
+            min_score=_clamp(int(min_score), 0, 5),
+            max_papers_per_day=_clamp(int(max_papers_per_day), 1, 50),
+            lookback_days=_clamp(int(lookback_days), 1, 30),
             send_at=send_at.strip() or "08:30",
             timezone=timezone,
             auto_optimize=1 if auto_optimize else 0,
@@ -303,10 +303,16 @@ def rollback_interest(request: Request, interest_id: int, version: int = Form(0)
         return guard
     if not check_csrf(request, csrf):
         return RedirectResponse(f"/interests/{interest_id}", status_code=303)
+    user = must_user(request)
     from app.interest.revise import rollback_to
 
-    rollback_to(interest_id, int(version))
-    return RedirectResponse(f"/interests/{interest_id}", status_code=303)
+    # 必须传 user_id：rollback_to 只在拿到 user_id 时才校验归属，
+    # 缺省会走 user_id=None 分支把校验整个跳过 —— 校验函数改了但路由
+    # 没接线，IDOR 依旧可利用。
+    if not rollback_to(interest_id, int(version), user_id=int(user.id)):
+        request.state.flash = "回滚失败：订阅不存在或不属于你"
+        request.state.flash_kind = "error"
+    return RedirectResponse("/interests", status_code=303)
 
 
 # ------------------------------------------------------------ 订阅编辑

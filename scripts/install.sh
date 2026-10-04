@@ -93,11 +93,12 @@ chmod 700 "$APP_DIR/data"
 sudo -u paperpulse "$APP_DIR/.venv/bin/python" -m app.cli init-db
 
 say "7/8 安装 systemd 与 Caddy"
+# unit 文件里已经用 EnvironmentFile 读取 .env，不需要任何 sed 替换 ——
+# 早期版本靠 sed 把 `Environment=PAPERPULSE_SECRET_KEY=` 换成 EnvironmentFile，
+# 但 unit 后来直接改成了 EnvironmentFile 写法，那条 sed 就成了指向不存在行的
+# 死配置（无害但误导）。这里只做路径替换。
 sed -e "s#/opt/paperpulse#${APP_DIR}#g" \
-    -e "s#^Environment=PAPERPULSE_SECRET_KEY=#EnvironmentFile=${APP_DIR}/.env#g" \
     "$APP_DIR/deploy/paperpulse.service" > /etc/systemd/system/paperpulse.service
-# EnvironmentFile 只需一行，去掉第二行重复的 Environment
-sed -i '/^Environment=PAPERPULSE_ENCRYPTION_KEY=/d' /etc/systemd/system/paperpulse.service
 
 if ! command -v caddy >/dev/null 2>&1; then
   # Caddy 官方源。注意：Cloudsmith 会轮换签名密钥，官方文档里的 key 有时效性，

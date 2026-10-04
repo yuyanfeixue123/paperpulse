@@ -55,11 +55,14 @@ def get_client() -> httpx.Client:
 MAX_REDIRECTS = 3
 
 
-def _guarded_get(client, url, *, headers=None, timeout=None, **kwargs):
+def _guarded_get(client, url, *, params=None, headers=None, timeout=None, **kwargs):
     """GET 并逐跳校验重定向。
 
     修复的漏洞：全局 follow_redirects=True 时，外网 URL 通过校验后
     302 跳到 127.0.0.1 即可绕过 —— 校验只在入口做一次。
+
+    `params` 只对首个请求生效：重定向后的 Location 通常已自带查询串，
+    重复附加会污染目标 URL。
     """
     from app.core.urlguard import UnsafeURL, resolve_and_check
 
@@ -71,6 +74,7 @@ def _guarded_get(client, url, *, headers=None, timeout=None, **kwargs):
             raise httpx.InvalidURL(f"目标地址被安全策略拒绝：{exc}") from exc
         resp = client.get(
             current,
+            params=params,
             headers=headers,
             timeout=timeout or DEFAULT_TIMEOUT,
             follow_redirects=False,
@@ -80,6 +84,8 @@ def _guarded_get(client, url, *, headers=None, timeout=None, **kwargs):
             from urllib.parse import urljoin
 
             current = urljoin(current, resp.headers["location"])
+            # 重定向后不再附加原始 params：Location 已含目标查询串
+            params = None
             continue
         return resp
     raise httpx.TooManyRedirects("重定向次数过多")
@@ -141,7 +147,12 @@ def limited_get(
         merged_headers = {"User-Agent": user_agent()}
         if headers:
             merged_headers.update(headers)
-        resp = get_client().get(
+        # 走 _guarded_get：既逐跳校验重定向（防 SSRF），又保留跟随能力。
+        # 直接用 client.get 会因 client 级 follow_redirects=False 而
+        # 完全不跟随重定向 —— 会 301/302 的 feed 与 API（http→https、
+        # arXiv export 等）会静默失败。
+        resp = _guarded_get(
+            get_client(),
             url,
             params=params,
             headers=merged_headers,
@@ -177,7 +188,10 @@ def conditional_get(
         _wait_token(key)
         merged = {"User-Agent": user_agent()}
         merged.update(headers)
-        resp = get_client().get(
+        # 与 limited_get 一样走 _guarded_get：逐跳校验 + 保留重定向跟随。
+        # 条件请求（ETag / Last-Modified）的源同样可能返回 301/302。
+        resp = _guarded_get(
+            get_client(),
             url,
             headers=merged,
             timeout=timeout or DEFAULT_TIMEOUT,

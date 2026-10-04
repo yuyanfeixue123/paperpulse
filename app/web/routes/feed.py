@@ -13,10 +13,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
+from sqlalchemy import bindparam as sa_bindparam
 
 from app.core.db import SessionLocal
 from app.core.logging import get_logger
-from app.core.quota import recommend_allowed, record_recommend_run
+from app.core.quota import recommend_allowed, record_recommend_run, snapshot
 from app.core.utils import load_list, today_local, truncate
 from app.interest.revise import record_feedback
 from app.models.digest import Digest
@@ -149,7 +150,9 @@ def feed(request: Request):
         items: list[dict] = []
         if digest is not None and digest.digest_date == today:
             items = _rows_for(int(digest.id))[:_MAX_ITEMS]
-            source = f"摘要 #{digest.id}（{digest.digest_date}）"
+            # 「摘要 #123（2026-10-04）」对用户没有信息量 —— 内部 id 是实现细节。
+            # 只说「今天已生成」，真正有用的日期已经在页头展示了。
+            source = "今日已生成"
         else:
             preview = True
             any_preview = True
@@ -172,9 +175,14 @@ def feed(request: Request):
         )
 
     allowed, reason = recommend_allowed(int(user.id))
-    from app.core.quota import snapshot
-
     q = snapshot(int(user.id))
+    if q.recommend_exhausted:
+        allowed, reason = False, reason
+    running_id = 0
+    try:
+        running_id = int(request.query_params.get("running", 0) or 0)
+    except (TypeError, ValueError):
+        running_id = 0
     return render(
         request,
         "feed.html",
@@ -188,19 +196,23 @@ def feed(request: Request):
         recommend_reason=reason,
         runs_used=q.recommend_runs,
         runs_limit=q.recommend_limit,
+        running_task_id=running_id,
         csrf=csrf_for(request),
     )
 
 
 @router.post("/feed/recommend")
 def recommend_now(request: Request, csrf: str = Form("")):
-    """立刻推荐：为所有启用中的订阅重算一次今日推荐并刷新页面。
+    """立刻推荐：为所有启用中的订阅重算一次今日推荐。
 
-    三点约束：
+    改为**异步入队**：每个订阅要跑召回 + LLM 批量打分，多订阅用户同步
+    等会把浏览器卡死几分钟（网关超时 + 用户连点）。这里只入队，
+    页面轮询 task_runs 展示进度。
+
+    三点约束不变：
     1. **邮件额度用尽后仍可推荐** —— 站内浏览不受邮件额度影响；
     2. 受「每日推荐次数」限制以控 token 成本，自带 Key 的用户豁免；
-    3. 只重算**今日摘要**，不新建额外摘要，因此不会重复推送邮件
-       （去重由 build_digest 的 UNIQUE(interest_id, digest_date) 保证）。
+    3. 只重算**今日摘要**且不入队邮件，因此不会重复推送。
     """
     guard = login_required(request)
     if guard:
@@ -227,21 +239,57 @@ def recommend_now(request: Request, csrf: str = Form("")):
         request.state.flash_kind = "error"
         return RedirectResponse("/interests", status_code=303)
 
-    from app.pipeline.digest import build_digest
+    from app.scheduler.runner import enqueue
 
-    built = 0
-    for interest in interests:
-        try:
-            if build_digest(int(interest.id), rebuild=True) is not None:
-                built += 1
-        except Exception as exc:  # noqa: BLE001 单个失败不应中断其余
-            log.warning("feed.recommend_failed", interest=interest.id, error=str(exc)[:200])
-
+    ids = [int(i.id) for i in interests]
+    # 同一用户已有在跑的推荐任务时不再重复入队（enqueue 自带同 payload 去重，
+    # 这里加 user_id 维度确保不同用户的任务不互相抑制）
+    task_id = enqueue("recommend_now", {"user_id": int(user.id), "interest_ids": ids})
     record_recommend_run(int(user.id))
-    noun = "个订阅" if built != 1 else "个订阅"
-    request.state.flash = f"已为 {built} {noun}重新生成今日推荐"
-    request.state.flash_kind = "ok"
-    return RedirectResponse("/feed", status_code=303)
+
+    if task_id is None:
+        request.state.flash = "推荐已在进行中，请稍候"
+        request.state.flash_kind = "error"
+    else:
+        request.state.flash = f"已开始为 {len(ids)} 个订阅重新生成推荐，完成后本页会自动刷新"
+        request.state.flash_kind = "ok"
+    resp = RedirectResponse(f"/feed?running={task_id or 0}", status_code=303)
+    return resp
+
+
+@router.get("/feed/status")
+def recommend_status(request: Request, task_id: int = 0):
+    """轮询推荐任务进度。供页面自动刷新用。"""
+    guard = login_required(request)
+    if guard:
+        return guard
+    import json
+
+    from app.models.task import TaskRun
+
+    me = current_user(request)
+    if me is None:
+        return {"state": "unknown"}
+
+    with SessionLocal() as s:
+        row = s.get(TaskRun, int(task_id)) if task_id else None
+    # 任务归属校验：不能靠 task_id 窥探他人任务。
+    # 必须真正解析 JSON —— 早先用字符串匹配 `"user_id": 999`，
+    # 一旦 json.dumps 的分隔符风格变化（sort_keys / separators）校验就静默失效。
+    if row is not None:
+        try:
+            owner = int(json.loads(row.payload_json or "{}").get("user_id", 0))
+        except (ValueError, TypeError):
+            owner = 0
+        if owner != int(me.id):
+            row = None
+    if row is None:
+        return {"state": "unknown"}
+    return {
+        "state": row.status,
+        "done": row.status in ("done", "failed"),
+        "error": row.last_error[:200] if row.status == "failed" else "",
+    }
 
 
 @router.post("/feed/rate")
@@ -374,9 +422,9 @@ def _stream_rows(user_id: int, size: int, offset: int) -> tuple[int, list[dict]]
                 """
                 SELECT p.id, p.title, p.abstract, p.authors_json, p.venue,
                        p.published_at, p.url, p.doi,
-                       MAX(ls.score)                AS best_score,
-                       GROUP_CONCAT(DISTINCT i.name) AS interest_names,
-                       COUNT(DISTINCT ls.interest_id) AS hit_count
+                       MAX(ls.score)                  AS best_score,
+                       COUNT(DISTINCT ls.interest_id) AS hit_count,
+                       MAX(ls.interest_id)            AS primary_interest
                 FROM llm_scores ls
                 JOIN interests i ON i.id = ls.interest_id
                 JOIN papers    p ON p.id = ls.paper_id
@@ -389,11 +437,34 @@ def _stream_rows(user_id: int, size: int, offset: int) -> tuple[int, list[dict]]
             {"u": user_id, "lim": size, "off": offset},
         ).all()
 
+    if not rows:
+        return total, []
+
+    # 找出每篇论文命中的全部订阅（用于渲染 chip）。
+    # 不用 GROUP_CONCAT：它按逗号拼接，而订阅名本身可能含逗号，会被拆碎。
+    paper_ids = [int(r[0]) for r in rows]
+    hits: dict[int, list[str]] = {}
+    if paper_ids:
+        with SessionLocal() as s:
+            for pid, iname in s.execute(
+                sql(
+                    "SELECT ls.paper_id, i.name FROM llm_scores ls "
+                    "JOIN interests i ON i.id = ls.interest_id "
+                    "WHERE i.user_id = :u AND ls.paper_id IN :ids "
+                    "ORDER BY ls.score DESC"
+                ).bindparams(sa_bindparam("ids", expanding=True)),
+                {"u": int(user_id), "ids": paper_ids},
+            ).all():
+                name = (iname or "").strip()
+                if name:
+                    hits.setdefault(int(pid), []).append(name)
+
     items: list[dict] = []
     for r in rows:
+        pid = int(r[0])
         items.append(
             {
-                "id": int(r[0]),
+                "id": pid,
                 "title": r[1],
                 "summary": truncate(r[2] or "", 300),
                 "authors": load_list(r[3]),
@@ -403,8 +474,11 @@ def _stream_rows(user_id: int, size: int, offset: int) -> tuple[int, list[dict]]
                 "doi": r[7] or "",
                 "llm_score": int(r[8]),
                 "stars": "★" * int(r[8]) + "☆" * (5 - int(r[8])),
-                "interest_names": [n for n in (r[9] or "").split(",") if n],
-                "hit_count": int(r[10]),
+                # 完整订阅名列表（不做逗号切分，订阅名本身可能含逗号）
+                "interest_names": [n for n in hits.get(pid, []) if n],
+                "hit_count": int(r[9]),
+                # 评价要落到具体订阅上：取分数最高的那一个
+                "interest_id": int(r[10]) if r[10] else 0,
             }
         )
     return total, items

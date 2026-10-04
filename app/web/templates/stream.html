@@ -35,7 +35,12 @@
   <div class="row" style="align-items:flex-start">
     <div style="flex:1">
       <div style="font-weight:600;font-size:15px;margin-bottom:4px">
-        <a href="{{ it.doi and ('https://doi.org/' ~ it.doi) or it.url }}" target="_blank" rel="noopener">{{ it.title }}</a>
+        {% if it.doi or it.url %}
+          <a href="{{ it.doi and ('https://doi.org/' ~ it.doi) or it.url }}" target="_blank" rel="noopener">{{ it.title }}</a>
+        {% else %}
+          {# doi 与 url 都为空时不要渲染 href="" —— 那会让点击跳回本页 #}
+          <span>{{ it.title }}</span>
+        {% endif %}
       </div>
       <div class="small muted">
         {{ it.authors[:3] | join(', ') }}{% if it.authors|length > 3 %} 等{% endif %}
@@ -59,6 +64,21 @@
     </div>
   </div>
   {% if it.summary %}<p style="margin:10px 0 0;color:#4b5563">{{ it.summary }}</p>{% endif %}
+  {# 评分是画像进化的核心闭环，登录后首页就是这一页，不能只有 /feed 能做 #}
+  <div class="rate-row">
+    <span class="small muted">这条推荐准吗？</span>
+    {% if it.interest_id %}
+    <form method="post" action="/feed/rate" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="paper_id" value="{{ it.id }}">
+      <input type="hidden" name="interest_id" value="{{ it.interest_id }}">
+      <button class="chip" name="rating" value="5" type="submit" title="很有用">👍 很有用</button>
+      <button class="chip" name="rating" value="3" type="submit" title="一般">一般</button>
+      <button class="chip" name="rating" value="1" type="submit" title="不感兴趣">👎 不感兴趣</button>
+    </form>
+    {% endif %}
+    <span class="small muted">评价会回流到画像进化，效果与邮件内点击一致</span>
+  </div>
 </div>
 {% endfor %}
 
@@ -70,4 +90,5 @@
 <p class="small muted" style="text-align:center">—— 已经到底了（共 {{ total }} 篇）——</p>
 {% endif %}
 {% endif %}
+<script src="{{ static('recommend-poll.js') }}"></script>
 {% endblock %}

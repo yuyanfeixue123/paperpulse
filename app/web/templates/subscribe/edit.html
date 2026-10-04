@@ -14,7 +14,7 @@
   只改关键词或推送参数则直接保存。两种方式都会记入修订历史，可随时回滚。
 </div>
 
-<form method="post" action="/interests/{{ interest.id }}/edit">
+<form method="post" action="/interests/{{ interest.id }}/edit" data-busy="正在保存，AI 重新解析可能需要十几秒…">
   <input type="hidden" name="csrf" value="{{ csrf }}">
 
   <div class="card">

@@ -56,7 +56,37 @@ python -c "import base64,os;print(base64.urlsafe_b64encode(os.urandom(32)).decod
 
 `ENCRYPTION_KEY` 变更会导致已加密的 LLM Key / 邮件凭据无法解密，需重新配置。
 
+### 3.1 不要设置 `PAPERPULSE_ENV`
+
+应用默认按**生产模式**运行：缺 `PAPERPULSE_SECRET_KEY` 或
+`PAPERPULSE_ENCRYPTION_KEY` 时**直接拒绝启动**，不会静默降级。
+
+只有显式设置 `PAPERPULSE_ENV=development`（或 `test`）才会启用内置弱密钥回退。
+生产环境误设这一项，会让会话 cookie 与 HMAC token 可被任意伪造 ——
+等于没有签名。后台「系统自检 → 密钥」会把该状态标为异常并给出说明。
+
+```bash
+# 生产：不要出现这一行
+# PAPERPULSE_ENV=development
+```
+
+### 3.2 反代与限流
+
+限流按客户端 IP 分桶，而 IP 取自 `X-Forwarded-For`。该头**只在直连对端
+命中受信列表时**才被采信，默认只信任回环地址（与 Caddy 同机的部署天然适用）。
+
+如果 uvicorn 端口被直接暴露到公网，攻击者可以伪造该头轮换身份绕过限流。
+务必经 Caddy / Nginx 访问；确需信任其他代理时：
+
+```bash
+PAPERPULSE_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.1
+```
+
 ## 4 首次部署引导（6 步）
+
+> **安全提示**：引导完成前，`/admin/setup/*` 允许「库中还没有账号」的人自举
+> 首位管理员。**部署完成后请立刻走完引导**，或直接关闭该端口。
+> 走完后这些端点会永久失效；若引导中途放弃，务必确认 `/admin/setup` 已不可访问。
 
 两条等价路径，随时可切换。
 

@@ -11,7 +11,7 @@
   <div class="notice">未启用 AI 解析（关键词模式），以下为本地抽取结果，请补充或修正关键词。</div>
 {% endif %}
 
-<form method="post" action="/interests">
+<form method="post" action="/interests" data-busy="正在创建订阅…">
   <input type="hidden" name="csrf" value="{{ csrf }}">
 
   <div class="card">

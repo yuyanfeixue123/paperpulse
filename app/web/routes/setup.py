@@ -92,6 +92,9 @@ def setup_1(
     timezone: str = Form("Asia/Shanghai"),
     csrf: str = Form(""),
 ):
+    guard = _require_unconfigured(request)
+    if guard:
+        return guard
     if not check_csrf(request, csrf):
         return RedirectResponse("/admin/setup", status_code=303)
     ok, msg = password_strength_ok(password)
@@ -113,7 +116,14 @@ def setup_1(
                 created_at=utc_iso(),
             )
             session.add(user)
+        elif user.is_admin:
+            # 已有管理员：走「改密码」而非「重置」，避免拿管理员邮箱
+            # 就能改掉他的密码。部署者若确实要换管理员，走后台用户管理。
+            _flash(request, "该邮箱已是管理员。请用其原密码登录，或在后台用户管理中处理。", "error")
+            return RedirectResponse("/admin/setup", status_code=303)
         else:
+            # 已存在的普通账号：可以提名为管理员（这是引导的既定用途），
+            # 但同样要重置密码 —— 因为提权后该账号的旧密码不该继续有效。
             user.is_admin = True
             user.password_hash = hash_password(password)
         session.commit()
@@ -159,6 +169,9 @@ def setup_3(
     mode: str = Form("llm"),
     csrf: str = Form(""),
 ):
+    guard = _require_unconfigured(request)
+    if guard:
+        return guard
     if not check_csrf(request, csrf):
         return RedirectResponse("/admin/setup", status_code=303)
 
@@ -268,6 +281,9 @@ def setup_5(request: Request, enabled: list[str] = Form([]), csrf: str = Form(""
 
 @router.post("/admin/setup/6")
 def setup_6(request: Request, csrf: str = Form("")):
+    guard = _require_unconfigured(request)
+    if guard:
+        return guard
     if not check_csrf(request, csrf):
         return RedirectResponse("/admin/setup", status_code=303)
     wizard.complete()

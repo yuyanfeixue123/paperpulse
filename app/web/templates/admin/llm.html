@@ -10,7 +10,7 @@
       {{ 'AI 模式' if mode == 'llm' else '关键词模式' }}
     </span>
     <div class="spacer"></div>
-    <form method="post" action="/admin/llm/test">
+    <form method="post" action="/admin/llm/test" data-busy="正在测试连接…">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <button class="btn secondary small" type="submit">测试连接</button>
     </form>

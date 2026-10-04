@@ -152,7 +152,6 @@ def register(
     )
     request.state.flash_kind = "ok"
     return RedirectResponse("/account/llm?welcome=1&next=/interests", status_code=303)
-    return render(request, "auth/registered.html", email=email)
 
 
 def _send_verification(email: str, user_id: int) -> None:

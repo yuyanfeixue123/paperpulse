@@ -58,21 +58,98 @@ def test_defaults_match_spec():
 
 
 def test_rate_limit_enforces_interval():
-    from app.core.http import configure_rate_limits
+    """限流间隔必须真的生效。
 
-    configure_rate_limits({"__testsrc__": {"interval_seconds": 0.4, "concurrency": 1}})
+    注意：limited_get 现在走 _guarded_get（逐跳校验重定向防 SSRF），
+    它会调用 resolve_and_check 做 DNS 解析 —— 所以这里必须把
+    resolve_and_check 也 mock 掉，否则测试会去查真实 DNS。
+    """
     from unittest.mock import patch
 
     from app.core import http
+    from app.core.http import configure_rate_limits
 
-    with patch.object(http, "get_client") as client:
-        client.return_value.get.return_value.status_code = 200
-        client.return_value.get.return_value.raise_for_status.return_value = None
+    configure_rate_limits({"__testsrc__": {"interval_seconds": 0.4, "concurrency": 1}})
+
+    resp = http.httpx.Response(200, request=http.httpx.Request("GET", "https://example.com"))
+    with patch.object(http, "_guarded_get", return_value=resp) as guarded:
         t0 = time.time()
         for _ in range(3):
             http.limited_get("https://example.com", "__testsrc__")
         elapsed = time.time() - t0
+    assert guarded.call_count == 3
     assert elapsed >= 0.8, f"三次请求应至少间隔 2×0.4s，实际 {elapsed:.2f}s"
+
+
+def test_guarded_get_follows_redirects_safely():
+    """回归：_guarded_get 此前是死代码，源抓取全都不跟随重定向。
+
+    连带后果是会 301/302 的 feed 与 API（http→https、arXiv export）
+    静默失败 —— 功能性回归。同时要确认逐跳校验真的生效。
+    """
+    from unittest.mock import patch
+
+    from app.core import http
+
+    def _resp(status: int, location: str = "") -> http.httpx.Response:
+        headers = {"location": location} if location else {}
+        return http.httpx.Response(
+            status,
+            headers=headers,
+            request=http.httpx.Request("GET", "https://example.com"),
+        )
+
+    with patch.object(http, "get_client") as client, patch(
+        "app.core.urlguard.resolve_and_check", return_value=["93.184.216.34"]
+    ) as guard:
+        client.return_value.get.side_effect = [
+            _resp(302, "https://example.com/final"),
+            _resp(200),
+        ]
+        out = http._guarded_get(client.return_value, "https://example.com/start")
+
+    assert out.status_code == 200
+    # 两个地址都应被校验过 —— 这正是「逐跳」的意义
+    assert guard.call_count == 2
+    targets = [c.args[0] for c in client.return_value.get.call_args_list]
+    assert targets[0] == "https://example.com/start"
+    assert targets[1] == "https://example.com/final"
+
+
+def test_guarded_get_rejects_redirect_to_private_ip():
+    """逐跳校验的核心价值：公网 URL 302 到内网必须被拒。"""
+    from unittest.mock import patch
+
+    from app.core import http
+    from app.core.urlguard import UnsafeURL
+
+    def _resp(status: int, location: str = "") -> http.httpx.Response:
+        headers = {"location": location} if location else {}
+        return http.httpx.Response(
+            status,
+            headers=headers,
+            request=http.httpx.Request("GET", "https://example.com"),
+        )
+
+    calls = {"n": 0}
+
+    def _check(url: str):
+        calls["n"] += 1
+        if "127.0.0.1" in url:
+            raise UnsafeURL("目标解析到内网地址")
+        return ["93.184.216.34"]
+
+    with patch.object(http, "get_client") as client, patch(
+        "app.core.urlguard.resolve_and_check", side_effect=_check
+    ):
+        client.return_value.get.side_effect = [_resp(302, "http://127.0.0.1/admin")]
+        try:
+            http._guarded_get(client.return_value, "https://example.com/start")
+        except http.httpx.InvalidURL:
+            pass
+        else:
+            raise AssertionError("302 到内网必须被拒绝")
+    assert calls["n"] == 2, "应校验两次：原地址 + 重定向目标"
 
 
 def test_env_file_is_loaded(monkeypatch):

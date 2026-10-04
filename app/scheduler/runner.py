@@ -40,6 +40,7 @@ def enqueue(kind: str, payload: dict | None = None, delay_seconds: int = 0) -> i
 
     from app.core.utils import now_utc
 
+    _ensure_handlers()
     payload = payload or {}
     payload_json = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     scheduled_at = utc_iso(now_utc() + timedelta(seconds=delay_seconds))
@@ -94,6 +95,9 @@ def _finish(task_id: int, status: str, error: str = "") -> None:
 
 
 def _execute(task_id: int, kind: str, payload: dict) -> None:
+    # 执行前再确认一次 handler 已注册：CLI 路径可能绕过 start_scheduler，
+    # 此时若 HANDLERS 为空，任务会被标 failed 并丢失工作。
+    _ensure_handlers()
     handler = HANDLERS.get(kind)
     if handler is None:
         _finish(task_id, "failed", f"未注册的任务类型：{kind}")
@@ -173,12 +177,29 @@ EXECUTOR = ThreadPoolExecutor(
 _start_lock = threading.Lock()
 
 
+def _ensure_handlers() -> None:
+    """确保任务 handler 已注册。
+
+    handler 的注册靠在 import jobs 时执行 @register，而 jobs 此前只在
+    start_scheduler 里导入 —— 于是 CLI 场景（enqueue 后由 run_once 手动
+    pump）会入队成功却没有 handler 执行，任务永远停在 pending。
+    这里做成幂等的显式加载，任何入队路径都先调它。
+    """
+    if HANDLERS:
+        return
+    from app.scheduler import jobs  # noqa: F401  导入即注册
+
+    if not HANDLERS:
+        log.warning("tasks.no_handlers_registered")
+
+
 def start_scheduler() -> None:
     global SCHEDULER
     with _start_lock:
         if SCHEDULER is not None:
             return
-        from app.scheduler import jobs  # noqa: F401  注册周期任务与 handler
+        _ensure_handlers()
+        from app.scheduler import jobs  # noqa: F401  register_periodic 在此定义
 
         SCHEDULER = BackgroundScheduler(timezone="UTC")
         SCHEDULER.add_job(pump_tasks, "interval", seconds=30, id="pump", max_instances=1)

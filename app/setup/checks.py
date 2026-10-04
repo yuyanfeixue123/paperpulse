@@ -133,15 +133,47 @@ def check_ntp() -> dict[str, Any]:
 
 
 def check_secrets() -> dict[str, Any]:
+    """密钥配置自检。
+
+    文案要区分「生产模式」与「弱密钥模式」：生产模式下缺密钥会**拒绝启动**，
+    根本走不到自检这一步；能走到这里说明 `PAPERPULSE_ENV` 被设成了
+    development/test，启用了内置弱密钥 —— 那必须显式警告，
+    因为弱密钥意味着会话与 HMAC token 可被任意伪造。
+    """
+    from app.core.security import _is_production
+
     has_secret = bool(os.environ.get("PAPERPULSE_SECRET_KEY"))
     has_enc = bool(os.environ.get("PAPERPULSE_ENCRYPTION_KEY"))
-    return {
-        "ok": has_secret and has_enc,
-        "detail": {
-            "PAPERPULSE_SECRET_KEY": "已设置" if has_secret else "缺失（使用开发默认值）",
-            "PAPERPULSE_ENCRYPTION_KEY": "已设置" if has_enc else "缺失（使用派生密钥）",
-        },
+    production = _is_production()
+    env_declared = os.environ.get("PAPERPULSE_ENV", "").strip()
+
+    detail: dict[str, str] = {
+        "PAPERPULSE_SECRET_KEY": "已设置" if has_secret else "缺失",
+        "PAPERPULSE_ENCRYPTION_KEY": "已设置" if has_enc else "缺失",
     }
+
+    if not has_secret or not has_enc:
+        if production:
+            # 生产模式缺密钥时应用已经启动失败，这里只是防御性提示
+            detail["状态"] = "生产模式：缺密钥将导致启动失败"
+            return {"ok": False, "detail": detail}
+        missing = [
+            k for k, v in (("PAPERPULSE_SECRET_KEY", has_secret),
+                           ("PAPERPULSE_ENCRYPTION_KEY", has_enc)) if not v
+        ]
+        detail["⚠ 风险"] = (
+            "当前启用了弱密钥回退（"
+            f"{', '.join(missing)} 缺失）。会话 cookie 与 HMAC token 可被"
+            "任意伪造。生产环境请补齐密钥，并确认 PAPERPULSE_ENV 未被"
+            f"设为 development（当前值：{env_declared or '未设置'}）。"
+        )
+        return {"ok": False, "detail": detail}
+
+    if env_declared:
+        detail["PAPERPULSE_ENV"] = (
+            f"{env_declared} —— 生产环境不应设置此项，它会放宽密钥要求"
+        )
+    return {"ok": True, "detail": detail}
 
 
 ALL_CHECKS = {
