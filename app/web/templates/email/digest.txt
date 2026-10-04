@@ -1,5 +1,9 @@
-{{ site_name }} · {{ interest_name }}
-{{ digest_date }} · 共 {{ items|length }} 篇
+{{ salutation }}，这是你的每日论文
+{{ site_name }} · 订阅「{{ interest_name }}」 · {{ digest_date }} · 共 {{ items|length }} 篇{% if lookback_days %} · 取自最近 {{ lookback_days }} 天{% endif %}
+
+早上好。这是系统按你的订阅自动筛选的结果，按相关度从高到低排列。
+觉得有用可以回邮件回复「有用」，不相关回复「不感兴趣」，
+你的选择会直接影响明天的推送。
 {% if keyword_mode %}
 （本次未启用 AI 精排，当前为关键词模式）
 {% endif %}
@@ -15,4 +19,8 @@
    不感兴趣: {{ it.boring_url }}
 
 {% endfor %}
-退订该订阅: {{ unsub_url }}
+--
+这封邮件由 {{ site_name }} 自动发送至你的订阅邮箱。
+
+退订「{{ interest_name }}」: {{ unsub_url }}
+调整推送设置: {{ site_url }}/interests/{{ interest_id }}

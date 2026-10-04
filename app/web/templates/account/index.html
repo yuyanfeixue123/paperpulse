@@ -9,7 +9,25 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="grid2">
       <div class="field">
-        <label>昵称</label>
+        <label>用户名（登录名）</label>
+        <input type="text" name="username" value="{{ current_user.username or '' }}"
+               autocomplete="username">
+        <p class="small muted">登录时输入用户名或邮箱均可</p>
+      </div>
+      <div class="field">
+        <label>订阅邮箱</label>
+        <input type="email" name="email" value="{{ current_user.email }}" required>
+        <p class="small muted">
+          每日摘要发到这里
+          {% if not current_user.email_verified %}
+            · <span class="badge warn">未验证</span>
+          {% else %}
+            · <span class="badge ok">已验证</span>
+          {% endif %}
+        </p>
+      </div>
+      <div class="field">
+        <label>昵称（邮件中的称呼）</label>
         <input type="text" name="display_name" value="{{ current_user.display_name }}">
       </div>
       <div class="field">
@@ -22,6 +40,32 @@
       </div>
     </div>
     <button type="submit">保存</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>推送默认值</h2>
+  <p class="small muted">
+    设定后会同步应用到你的<strong>全部现有订阅</strong>；新建订阅也会用这组默认值。
+  </p>
+  <form method="post" action="/account/defaults">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid3">
+      <div class="field">
+        <label>每次推送篇数</label>
+        <input type="number" name="max_papers_per_day" min="1" max="50" value="5">
+      </div>
+      <div class="field">
+        <label>论文新鲜度（回看天数）</label>
+        <input type="number" name="lookback_days" min="1" max="30" value="3">
+        <p class="small muted">只推送最近 N 天内的论文</p>
+      </div>
+      <div class="field">
+        <label>推送时间</label>
+        <input type="text" name="send_at" value="08:30" placeholder="08:30">
+      </div>
+    </div>
+    <button type="submit">应用到全部订阅</button>
   </form>
 </div>
 

@@ -51,6 +51,25 @@ def current_admin(request: Request) -> User | None:
     return user if (user and user.is_admin) else None
 
 
+FLASH_COOKIE = "pp_flash"
+FLASH_KIND = "pp_flash_kind"
+
+
+def set_flash(response: Response, message: str, kind: str = "") -> None:
+    """写一次性提示 cookie。
+
+    不能用 request.state：重定向后是全新请求，state 不跨请求，
+    那样设置的所有提示语都不会显示。
+    """
+    response.set_cookie(
+        FLASH_COOKIE, message[:500], max_age=60, httponly=True, samesite="lax", path="/"
+    )
+    response.set_cookie(
+        FLASH_KIND, kind[:20], max_age=60, httponly=True, samesite="lax", path="/"
+    )
+
+
+
 def must_user(request: Request) -> User:
     """在 login_required 之后调用：此时用户必然存在。"""
     user = current_user(request)

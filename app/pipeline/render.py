@@ -28,6 +28,8 @@ def render_digest(
     user_id: int,
     interest_id: int,
     keyword_mode: bool = False,
+    salutation: str = "",
+    lookback_days: int = 0,
 ) -> tuple[str, str, str]:
     """返回 (subject, html, text)。"""
     links = []
@@ -50,6 +52,8 @@ def render_digest(
         "site_url": site_url,
         "interest_name": interest_name,
         "digest_date": digest_date,
+        "salutation": salutation or "你好",
+        "lookback_days": lookback_days,
         "items": links,
         "unsub_url": one_click_unsubscribe_url(site_url, user_id, interest_id),
         "keyword_mode": keyword_mode,

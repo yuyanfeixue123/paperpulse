@@ -166,9 +166,17 @@ def render_digest_payload(digest_id: int) -> dict[str, Any] | None:
         site_url = (sysrow.site_url if sysrow else "") or ""
         site_name = (sysrow.site_name if sysrow else "") or "PaperPulse"
         llm_mode = (sysrow.llm_mode if sysrow else "keyword") or "keyword"
-        to_email = session.execute(
-            sql("SELECT email FROM users WHERE id = :u"), {"u": d.user_id}
-        ).scalar()
+        row = session.execute(
+            sql("SELECT email, display_name, username FROM users WHERE id = :u"),
+            {"u": d.user_id},
+        ).fetchone()
+        to_email = row[0] if row else ""
+        # 称呼优先级：昵称 -> 用户名 -> 邮箱前缀
+        salutation = ""
+        if row:
+            salutation = (row[1] or row[2] or (row[0] or "").split("@")[0] or "").strip()
+        interest_row = session.get(Interest, d.interest_id)
+        lookback = int(getattr(interest_row, "lookback_days", 0) or 0)
 
     items = []
     for r in rows:
@@ -198,6 +206,8 @@ def render_digest_payload(digest_id: int) -> dict[str, Any] | None:
         user_id=int(d.user_id),
         interest_id=int(d.interest_id),
         keyword_mode=(llm_mode != "llm"),
+        salutation=salutation,
+        lookback_days=lookback,
     )
     headers = {
         "List-Unsubscribe": f"<{site_url.rstrip('/')}/u/unsubscribe>, <https://{site_url}>",

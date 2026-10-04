@@ -46,6 +46,31 @@ def register_routes(app: FastAPI) -> None:
         app.include_router(module.router)
 
     @app.middleware("http")
+    async def flash_middleware(request: Request, call_next):
+        """把 _flash() 写在 request.state 上的提示语落到一次性 cookie。
+
+        request.state 不跨重定向存活，若不转成 cookie，全站所有提示语都不会显示。
+        """
+        from urllib.parse import quote
+
+        from app.web.deps import FLASH_COOKIE, FLASH_KIND
+
+        response = await call_next(request)
+        msg = getattr(request.state, "flash", "")
+        if msg:
+            kind = getattr(request.state, "flash_kind", "")
+            # cookie 只能编码 latin-1，中文提示语必须先 URL 编码
+            response.set_cookie(
+                FLASH_COOKIE, quote(str(msg))[:900], max_age=60,
+                httponly=True, samesite="lax", path="/",
+            )
+            response.set_cookie(
+                FLASH_KIND, quote(str(kind))[:60], max_age=60,
+                httponly=True, samesite="lax", path="/",
+            )
+        return response
+
+    @app.middleware("http")
     async def setup_gate(request: Request, call_next):
         path = request.url.path
         if path.startswith(EXEMPT_PREFIXES) or path.startswith("/admin/setup"):

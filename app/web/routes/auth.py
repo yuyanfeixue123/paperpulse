@@ -24,6 +24,11 @@ router = APIRouter()
 
 
 def _flash(request: Request, msg: str, kind: str = "") -> None:
+    """设置一次性提示语。
+
+    写在 request.state 上，由 flash_middleware 落到响应的 cookie ——
+    因为重定向后是全新请求，state 不会跨请求存活。
+    """
     request.state.flash = msg
     request.state.flash_kind = kind
 
@@ -41,6 +46,7 @@ def register(
     email: str = Form(""),
     password: str = Form(""),
     display_name: str = Form(""),
+    username: str = Form(""),
     csrf: str = Form(""),
 ):
     from app.web.deps import check_csrf
@@ -102,6 +108,7 @@ def login_page(request: Request):
 
 @router.post("/login")
 def login(request: Request, email: str = Form(""), password: str = Form(""), csrf: str = Form("")):
+    """email 字段实际接受「用户名或邮箱」——用户想用独立登录名时不强制绑定邮箱。"""
     from app.web.deps import check_csrf
 
     if not check_csrf(request, csrf):
@@ -112,9 +119,13 @@ def login(request: Request, email: str = Form(""), password: str = Form(""), csr
         _flash(request, "尝试过于频繁，请稍后再试", "error")
         return render(request, "auth/login.html", csrf=csrf_for(request))
 
-    email = email.strip().lower()
+    identifier = email.strip()
     with SessionLocal() as session:
-        user = session.query(User).filter(User.email == email).first()
+        user = (
+            session.query(User)
+            .filter((User.email == identifier.lower()) | (User.username == identifier))
+            .first()
+        )
         if user is None or not verify_password(password, user.password_hash):
             _flash(request, "邮箱或密码错误", "error")
             return render(request, "auth/login.html", csrf=csrf_for(request))

@@ -23,6 +23,11 @@ router = APIRouter()
 
 
 def _flash(request: Request, msg: str, kind: str = "") -> None:
+    """设置一次性提示语。
+
+    写在 request.state 上，由 flash_middleware 落到响应的 cookie ——
+    因为重定向后是全新请求，state 不会跨请求存活。
+    """
     request.state.flash = msg
     request.state.flash_kind = kind
 

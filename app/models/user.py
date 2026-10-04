@@ -11,6 +11,10 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    # 登录名：可与邮箱不同，留空则只能用邮箱登录
+    username: Mapped[str | None] = mapped_column(
+        Text, nullable=True, unique=True, index=True
+    )
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     display_name: Mapped[str] = mapped_column(Text, nullable=False, default="")
     timezone: Mapped[str] = mapped_column(Text, nullable=False, default="Asia/Shanghai")

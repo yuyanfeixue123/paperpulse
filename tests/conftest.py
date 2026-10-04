@@ -27,10 +27,14 @@ def _env():
 
     import app.core.db as dbmod
     from app.core.config import reload_settings
+    from app.models import Base
 
     reload_settings({"db": {"url": f"sqlite:///{TMP_DB}"}})
     dbmod._engine = None
-    dbmod.get_engine()
+    engine = dbmod.get_engine()
+    # 用 drop_all 而非删文件：Windows 下文件常被占用删不掉，
+    # 残留的旧表结构会导致「模型加了列但表里没有」的 500。
+    Base.metadata.drop_all(engine)
     dbmod.init_db()
     yield
     dbmod.SessionLocal.remove()

@@ -490,3 +490,207 @@ def test_welcome_task_is_registered():
     from app.scheduler.runner import HANDLERS
 
     assert "send_welcome" in HANDLERS
+
+
+def test_digest_email_contains_salutation_greeting_body_unsub(db):
+    """推送邮件必须包含称呼、问候、正文与退订链接四要素。"""
+    from app.pipeline.render import render_digest
+
+    items = [{
+        "id": 1, "title": "Street View Deep Learning for Built Environment",
+        "abstract": "abs", "authors": ["Ann Lee", "Bo Zhao", "Cy Xu", "Dee Wang"],
+        "venue": "Cities", "published_at": "2026-10-03T00:00:00+00:00",
+        "url": "https://example.com/1", "doi": "10.1234/abc",
+        "llm_score": 5, "reason": "高度相关",
+    }]
+    subject, html, text = render_digest(
+        site_url="https://pp.example.com",
+        site_name="PaperPulse",
+        interest_name="建成环境与LLM",
+        digest_date="2026-10-04",
+        items=items,
+        user_id=1,
+        interest_id=9,
+        salutation="yuyanfeixue",
+        lookback_days=3,
+    )
+    # 称呼
+    assert "yuyanfeixue，这是你的每日论文" in html
+    assert "yuyanfeixue，这是你的每日论文" in text
+    # 问候
+    assert "早上好" in html and "早上好" in text
+    # 正文
+    assert "Street View Deep Learning" in html
+    assert "Cities" in html and "高度相关" in html
+    # 退订链接
+    assert "/u/" in html and "退订" in html
+    assert "退订" in text and "pp.example.com" in text
+    # 设置说明
+    assert "最近 3 天" in html
+    assert "调整推送设置" in html
+
+
+def test_digest_email_falls_back_to_generic_salutation(db):
+    from app.pipeline.render import render_digest
+
+    _, html, _ = render_digest(
+        site_url="https://pp.example.com", site_name="PP", interest_name="I",
+        digest_date="2026-10-04", items=[], user_id=1, interest_id=1,
+    )
+    assert "你好，这是你的每日论文" in html
+
+
+def test_login_accepts_username_or_email(db):
+    from app.core.security import hash_password
+    from app.core.utils import utc_iso
+    from app.models.user import User
+
+    with db() as s:
+        s.add(User(
+            email="by-name@example.com", username="namel login".replace(" ", ""),
+            password_hash=hash_password("Passw0rd!x"), display_name="N",
+            email_verified=True, created_at=utc_iso(),
+        ))
+        s.commit()
+
+    _complete_setup()
+    c = _client()
+    csrf = _extract_csrf(c.get("/login").text)
+    r = c.post("/login", data={
+        "email": "namellogin", "password": "Passw0rd!x", "csrf": csrf,
+    }, follow_redirects=False)
+    assert r.status_code == 303, "用用户名登录应成功"
+    assert c.get("/account").status_code == 200
+
+
+def test_username_must_be_unique(db):
+    from app.core.security import hash_password
+    from app.core.utils import utc_iso
+    from app.models.user import User
+
+    with db() as s:
+        for un in ("dupuser", "other"):
+            s.add(User(email=f"{un}@example.com", username=un,
+                       password_hash=hash_password("Passw0rd!x"),
+                       created_at=utc_iso()))
+        s.commit()
+
+    _complete_setup()
+    c = _client()
+    c.post("/login", data={"email": "dupuser", "password": "Passw0rd!x",
+                           "csrf": _extract_csrf(c.get("/login").text)})
+    csrf = _extract_csrf(c.get("/account").text)
+    r = c.post("/account/profile", data={
+        "username": "other", "email": "dupuser@example.com",
+        "display_name": "x", "timezone": "UTC", "csrf": csrf,
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert "已被占用" in c.get("/account").text
+
+
+def test_account_defaults_apply_to_all_interests(db):
+    from app.core.security import hash_password
+    from app.core.utils import utc_iso
+    from app.models.interest import Interest
+    from app.models.user import User
+
+    with db() as s:
+        u = User(email="defs@example.com", username="defs",
+                 password_hash=hash_password("Passw0rd!x"), created_at=utc_iso())
+        s.add(u)
+        s.flush()
+        for n in range(2):
+            s.add(Interest(user_id=u.id, name=f"sub-{n}", description="d",
+                           include_keywords_json="[]", exclude_keywords_json="[]",
+                           source_keys_json="[]", arxiv_categories_json="[]",
+                           queries_json="{}", max_papers_per_day=10,
+                           lookback_days=7, send_at="08:30", created_at=utc_iso()))
+        s.commit()
+        uid = int(u.id)
+
+    _complete_setup()
+    c = _client()
+    c.post("/login", data={"email": "defs", "password": "Passw0rd!x",
+                           "csrf": _extract_csrf(c.get("/login").text)})
+    csrf = _extract_csrf(c.get("/account").text)
+    r = c.post("/account/defaults", data={
+        "max_papers_per_day": "5", "lookback_days": "3",
+        "send_at": "09:15", "csrf": csrf,
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    with db() as s:
+        rows = s.query(Interest).filter(Interest.user_id == uid).all()
+    assert len(rows) == 2
+    for it in rows:
+        assert it.max_papers_per_day == 5
+        assert it.lookback_days == 3
+        assert it.send_at == "09:15"
+
+
+def test_account_defaults_reject_bad_input(db):
+    assert _hhmm_ok("08:30") is True
+    assert _hhmm_ok("25:00") is False
+    assert _hhmm_ok("abc") is False
+    assert _hhmm_ok("8:5") is True
+
+
+def _hhmm_ok(v: str) -> bool:
+    from app.web.routes.account import _valid_hhmm
+
+    return _valid_hhmm(v)
+
+
+def test_flash_message_survives_redirect_with_chinese(db):
+    """回归：flash 走 cookie 传递，而 cookie 只能编码 latin-1，
+    中文提示语若不 URL 编码会抛 UnicodeEncodeError → 全站任何写操作都 500。"""
+    from app.core.security import hash_password
+    from app.core.utils import utc_iso
+    from app.models.user import User
+
+    with db() as s:
+        s.add(User(email="flash@example.com", username="flashu",
+                   password_hash=hash_password("Passw0rd!x"),
+                   created_at=utc_iso()))
+        s.commit()
+
+    _complete_setup()
+    c = _client()
+    c.post("/login", data={"email": "flashu", "password": "Passw0rd!x",
+                           "csrf": _extract_csrf(c.get("/login").text)})
+    r = c.post("/account/defaults", data={
+        "max_papers_per_day": "5", "lookback_days": "3",
+        "send_at": "09:15", "csrf": _extract_csrf(c.get("/account").text),
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    page = c.get("/account")
+    assert page.status_code == 200
+    assert "已设为每日 5 篇" in page.text, "中文提示语应能跨重定向显示"
+    # 读到即清：刷新不应重复显示
+    assert "已设为每日 5 篇" not in c.get("/account").text
+
+
+def test_flash_rejects_bad_values(db):
+    from app.core.security import hash_password
+    from app.core.utils import utc_iso
+    from app.models.user import User
+
+    with db() as s:
+        s.add(User(email="flash2@example.com", username="flashu2",
+                   password_hash=hash_password("Passw0rd!x"),
+                   created_at=utc_iso()))
+        s.commit()
+
+    _complete_setup()
+    c = _client()
+    c.post("/login", data={"email": "flashu2", "password": "Passw0rd!x",
+                           "csrf": _extract_csrf(c.get("/login").text)})
+    c.post("/account/defaults", data={
+        "max_papers_per_day": "abc", "lookback_days": "3",
+        "send_at": "09:15", "csrf": _extract_csrf(c.get("/account").text),
+    }, follow_redirects=False)
+    assert "必须是整数" in c.get("/account").text
+    c.post("/account/defaults", data={
+        "max_papers_per_day": "5", "lookback_days": "3",
+        "send_at": "99:99", "csrf": _extract_csrf(c.get("/account").text),
+    }, follow_redirects=False)
+    assert "HH:MM" in c.get("/account").text
