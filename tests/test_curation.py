@@ -154,3 +154,41 @@ def _complete_setup_client() -> None:
     from tests.test_app import _complete_setup
 
     _complete_setup()
+
+
+def test_all_items_filtered_does_not_contradict_itself():
+    """回归：全部命中时兜底把完整列表发出去，此时若仍报「其余 N 篇未送达」，
+    会出现「上方列出 2 篇 + 其余 2 篇 = 总共 2 篇」的自相矛盾。"""
+    import re
+
+    from app.pipeline.render import render_digest
+
+    reload_settings({"email": {"content_filter_patterns": [r".*"]}})  # 全命中
+    items = [
+        {"id": i, "title": f"T{i}", "abstract": "abs " * 60, "authors": ["A"],
+         "venue": "V", "published_at": "2026-10-03T00:00:00+00:00",
+         "url": "https://e.com", "doi": f"10.1/{i}", "llm_score": 5, "reason": "r"}
+        for i in (1, 2)
+    ]
+    _, html, text = render_digest(
+        site_url="https://pp.example.com", site_name="PP", interest_name="I",
+        digest_date="2026-10-04", items=items, user_id=1, interest_id=1,
+    )
+    # 完整列表在正文里
+    assert "T1" in html and "T2" in html
+    # 不应出现自相矛盾的提示
+    assert "未通过本邮件通道送达" not in html
+    assert "未通过本邮件通道送达" not in text
+
+    # 正常有裁剪时，数字必须自洽
+    reload_settings({"email": {"content_filter_patterns": [r"T1\b"]}})
+    _, html2, _ = render_digest(
+        site_url="https://pp.example.com", site_name="PP", interest_name="I",
+        digest_date="2026-10-04", items=items, user_id=1, interest_id=1,
+    )
+    m = re.search(r"本期共推荐 (\d+) 篇，上方列出 (\d+) 篇。其余 (\d+) 篇", html2, re.S)
+    assert m, "应显示裁剪提示"
+    total, shown, held = (int(x) for x in m.groups())
+    assert total == shown + held, f"{total} != {shown} + {held}"
+    assert total == 2 and shown == 1 and held == 1
+    reload_settings()

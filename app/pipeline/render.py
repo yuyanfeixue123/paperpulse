@@ -40,7 +40,14 @@ def render_digest(
     from app.pipeline.curation import split_for_email
 
     emailable, withheld = split_for_email(items)
-    shown = emailable or items  # 全被过滤时至少把列表给出去，不空发
+    if emailable:
+        shown = emailable
+        withheld_count = len(withheld)
+    else:
+        # 全部命中时：宁可完整发出去，也不发一封空信。
+        # 此时不能说「其余 N 篇未送达」——它们就在正文里，数量会自相矛盾。
+        shown = items
+        withheld_count = 0
 
     links = []
     for it in shown:
@@ -65,7 +72,7 @@ def render_digest(
         "salutation": salutation or "你好",
         "lookback_days": lookback_days,
         "items": links,
-        "withheld_count": len(withheld),
+        "withheld_count": withheld_count,
         "total_count": len(items),
         "feed_url": f"{site_url.rstrip('/')}/feed",
         "unsub_url": one_click_unsubscribe_url(site_url, user_id, interest_id),
