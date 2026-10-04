@@ -221,3 +221,18 @@ def test_pipeline_never_filters_outside_email_render():
         assert "is_emailable" not in text, f"{name} 不应引用内容过滤"
     assert "curation" in (root / "pipeline" / "render.py").read_text(encoding="utf-8")
     assert "curation" in (root / "web" / "routes" / "feed.py").read_text(encoding="utf-8")
+
+
+def test_record_handles_none_counters(monkeypatch):
+    """回归：新建 ChannelTerm 时计数列是 None（列默认值只在 INSERT 生效），
+    int(None) 会让整个探测任务崩溃。"""
+    import app.pipeline.probe as probe_mod
+
+    row = _FakeRow("x")
+    row.blocked_hits = None  # type: ignore[assignment]
+    row.miss_hits = None  # type: ignore[assignment]
+    monkeypatch.setattr("app.core.db.SessionLocal", lambda: _FakeSession(row))
+
+    probe_mod._record(ProbeOutcome("x", False), "aliyun", 2, ProbeReport())
+    assert row.miss_hits == 1
+    assert row.blocked_hits == 0

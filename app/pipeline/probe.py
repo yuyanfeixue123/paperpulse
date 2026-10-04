@@ -106,11 +106,16 @@ def propose_terms(snippets: list[str], max_terms: int = 12) -> list[str]:
 
     blob = "\n".join(snippets)[:3000]
     try:
+        # 管理员配置的多为推理模型（deepseek-flash 等），reasoning 会吃掉大半
+        # token 预算；这里显式放宽，避免 finish_reason=length 导致猜词失败。
+        from app.core.config import get_settings
+
         data = complete_json(
             "revise",
             "你是一位熟悉邮件内容审核规则的助手。只输出 JSON 数组。",
             _PROMPT % blob,
             _TERMS_SCHEMA,
+            max_tokens=max(8192, get_settings().llm.max_tokens * 2),
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("probe.llm_failed", error=str(exc)[:180])
@@ -241,10 +246,15 @@ def _record(
                 provider_key=provider_key,
                 term=outcome.term,
                 source="auto-probe",
+                active=False,
+                blocked_hits=0,
+                miss_hits=0,
+                last_error="",
                 created_at=utc_iso(),
             )
-        row.blocked_hits = int(row.blocked_hits) + 1 if outcome.blocked else 0
-        row.miss_hits = 0 if outcome.blocked else int(row.miss_hits) + 1
+        # 列默认值只在 INSERT 时生效，ORM 侧仍可能是 None
+        row.blocked_hits = (int(row.blocked_hits or 0) + 1) if outcome.blocked else 0
+        row.miss_hits = 0 if outcome.blocked else int(row.miss_hits or 0) + 1
         row.last_error = outcome.error[:300]
         row.last_tested_at = utc_iso()
         if row.blocked_hits >= confirmations_required:
