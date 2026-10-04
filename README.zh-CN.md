@@ -177,7 +177,7 @@ python -m app.cli run-once fetch|dispatch|digest|purge|revise [id]
 
 邮件要受通道的内容政策与体积限制，站内列表不受。登录后访问 `/feed`
 （或直接点首页）即可看到**全部**推荐，按相关度从高到低排序，含标题、DOI、
-简述与推荐理由，可直接评分回��画像。
+简述与推荐理由，可直接评分回流到画像。
 
 若邮件通道按内容审核拒收（常见于国内通道），可在
 `config/config.yaml` 配置 `email.content_filter_patterns`：
