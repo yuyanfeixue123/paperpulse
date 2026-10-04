@@ -236,3 +236,18 @@ def test_record_handles_none_counters(monkeypatch):
     probe_mod._record(ProbeOutcome("x", False), "aliyun", 2, ProbeReport())
     assert row.miss_hits == 1
     assert row.blocked_hits == 0
+
+
+def test_all_passed_flag_signals_not_word_blacklist():
+    """逐词探测全通过 => 不是单词黑名单。此时不应新增词条（避免误封），
+    但要给出可执行的解读。"""
+    r = ProbeReport(probed=8)
+    r.newly_blocked = []
+    r.all_passed = True
+    assert "组合语义" in r.note
+    assert "/admin/terms" in r.note
+
+    r2 = ProbeReport(probed=8, all_passed=False)
+    r2.newly_blocked = ["transgender"]
+    assert "已确认 1 个词" in r2.note
+    assert "组合语义" not in r2.note

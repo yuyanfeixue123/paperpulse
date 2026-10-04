@@ -143,6 +143,7 @@ def task_probe_channel_terms(payload: dict) -> None:
             probed=report.probed,
             activated=len(report.newly_blocked),
             cleared=len(report.cleared),
+            note=report.note,
         )
 
 

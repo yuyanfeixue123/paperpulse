@@ -71,10 +71,24 @@ class ProbeReport:
     cleared: list[str] = field(default_factory=list)
     skipped_reason: str = ""
     candidates: list[str] = field(default_factory=list)
+    all_passed: bool = False
 
     @property
     def ok(self) -> bool:
         return not self.skipped_reason
+
+    @property
+    def note(self) -> str:
+        """给管理员的解读 —— 探测结果不能只报「成功/失败」。"""
+        if self.newly_blocked:
+            return f"已确认 {len(self.newly_blocked)} 个词会被该通道拒收，已加入词库"
+        if self.all_passed and self.probed:
+            return (
+                f"{self.probed} 个候选词单独投递均被放行 —— 说明该通道不是按单词拦截，"
+                "而是判定整封内容的组合语义。此时逐词探测无法复现拒收，"
+                "建议在 /admin/terms 手工添加词条，或改用审核更宽松的通道"
+            )
+        return ""
 
 
 # ---------------------------------------------------------------- 候选词生成
@@ -221,6 +235,11 @@ def run_probe(
             outcome = ProbeOutcome(term=term, blocked=blocked, error=str(exc)[:200])
         report.probed += 1
         _record(outcome, provider_row.key, confirmations_required, report)
+
+    # 逐词探测全部放行 => 该通道不是按单词拦截，逐词探测无法复现整封拒收
+    report.all_passed = report.probed > 0 and not report.newly_blocked
+    if report.all_passed:
+        log.info("probe.all_passed", probed=report.probed)
     return report
 
 
