@@ -16,11 +16,12 @@ branch_labels: str | None = None
 depends_on: str | None = None
 
 TABLE = "users"
-# (列名, 类型, server_default)
-COLUMNS: tuple[tuple[str, str, str], ...] = (
-    ("daily_email_quota", "Integer", "NULL"),
-    ("daily_recommend_quota", "Integer", "NULL"),
-    ("email_quota_unlimited", "Integer", "0"),
+# (列名, server_default)。类型统一为 Integer —— 之前用 sa.type_coerce(type_)
+# 是错的：type_coerce 是把字符串类型名转成实例的工厂函数，不是类型转换器。
+COLUMNS: tuple[tuple[str, str], ...] = (
+    ("daily_email_quota", "NULL"),
+    ("daily_recommend_quota", "NULL"),
+    ("email_quota_unlimited", "0"),
 )
 
 
@@ -31,11 +32,11 @@ def upgrade() -> None:
         return
     existing = {c["name"] for c in insp.get_columns(TABLE)}
     with op.batch_alter_table(TABLE) as batch:
-        for name, type_, default in COLUMNS:
+        for name, default in COLUMNS:
             if name in existing:
                 continue
             batch.add_column(
-                sa.Column(name, sa.type_coerce(type_), nullable=True, server_default=default)
+                sa.Column(name, sa.Integer(), nullable=True, server_default=default)
             )
 
 
@@ -46,6 +47,6 @@ def downgrade() -> None:
         return
     existing = {c["name"] for c in insp.get_columns(TABLE)}
     with op.batch_alter_table(TABLE) as batch:
-        for name, _, _ in reversed(COLUMNS):
+        for name, _ in reversed(COLUMNS):
             if name in existing:
                 batch.drop_column(name)
