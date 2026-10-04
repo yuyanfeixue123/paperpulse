@@ -191,3 +191,43 @@ th { font-size: 12px; color: var(--muted); font-weight: 600; }
   color: #1e40af; font-size: 12px;
 }
 .help-box table { font-size: 12px; margin-top: 6px; }
+
+/* 兴趣点分组标题：/feed 按订阅依次展示时用 */
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 26px 0 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* 评价行：卡片底部的「这条推荐准吗？」 */
+.rate-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+/* 评价按钮复用 .chip 的外观，但要像可点按钮 */
+button.chip { cursor: pointer; font-family: inherit; }
+button.chip:hover { background: #e2e8f0; border-color: var(--accent); }
+
+/* 关键词点击选择：订阅配置页的标签选择器 */
+.kw-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.kw-picker .chip { cursor: pointer; user-select: none; }
+.kw-picker .chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.kw-input-row { display: flex; gap: 8px; align-items: center; }
+.kw-input-row input { flex: 1; }
+.kw-live { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* 密码实时校验（注册页） */
+.pw-rules { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 12px; }
+.pw-rules:not(.active) { display: none; }
+.pw-ok { color: var(--ok); }
+.pw-bad { color: var(--muted); }
+.pw-rules.active .pw-bad { color: var(--danger); }

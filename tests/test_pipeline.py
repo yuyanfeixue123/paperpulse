@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
 from app.core.utils import (
     dedup_key_of,
     freshness,
@@ -122,12 +124,26 @@ def test_enrich_marks_short_abstract():
 
 
 def test_ssrf_guard():
-    from app.sources.rss import is_safe_url
+    """SSRF 校验：必须解析 DNS，不能只看字面 IP。"""
+    from app.core.urlguard import UnsafeURL, is_safe_url, resolve_and_check
 
-    assert is_safe_url("https://example.com/feed.rss")[0] is True
+    assert is_safe_url("https://export.arxiv.org/api/query")[0] is True
+    # 字面 IP
     assert is_safe_url("http://127.0.0.1/feed")[0] is False
+    assert is_safe_url("http://169.254.169.254/latest")[0] is False
     assert is_safe_url("http://10.0.0.5/feed")[0] is False
+    assert is_safe_url("http://[::1]/feed")[0] is False
+    # 协议与端口
     assert is_safe_url("file:///etc/passwd")[0] is False
+    assert is_safe_url("https://github.com:8443/x")[0] is False
+    # 域名解析到内网必须拦下（localtest.me 固定解析 127.0.0.1）
+    ok, why = is_safe_url("http://localtest.me/x")
+    if not ok:
+        assert "解析" in why or "端口" in why
+    # 显式禁止内网的开关供测试内网源使用
+    with pytest.raises(UnsafeURL):
+        resolve_and_check("http://127.0.0.1/x")
+    assert resolve_and_check("http://127.0.0.1/x", allow_private=True)
 
 
 def test_arxiv_query_construction():

@@ -62,8 +62,53 @@ def select_candidates(interest: Interest) -> list[dict]:
     return rank_papers(interest, papers, scores)
 
 
-def build_digest(interest_id: int, date: str = "") -> int | None:
-    """构建一份摘要。UNIQUE(interest_id, digest_date) 保证幂等。"""
+def _exclude_already_digested(
+    user_id: int, digest_id: int, items: list[dict]
+) -> list[dict]:
+    """剔除此前摘要里已经出现过的论文。
+
+    范围限定为「同一用户 + 同一订阅」的其他摘要（含更早的、也含更晚的），
+    但**不含本次正在重建的这一份**（它的条目已被清空，留着也不影响）。
+    按用户而非按订阅去重，是为了让「同���篇论文不要在两个订阅的邮件里
+    反复出现」这一诉求也成立。
+    """
+    from sqlalchemy import text as sql
+
+    paper_ids = [int(it["id"]) for it in items]
+    if not paper_ids:
+        return items
+    placeholders = ",".join(str(i) for i in paper_ids)
+    with SessionLocal() as session:
+        rows = session.execute(
+            sql(
+                f"SELECT DISTINCT di.paper_id FROM digest_items di "
+                f"JOIN digests g ON g.id = di.digest_id "
+                f"WHERE g.user_id = :u AND di.digest_id != :self "
+                f"AND di.paper_id IN ({placeholders})"
+            ),
+            {"u": user_id, "self": digest_id},
+        ).all()
+    seen = {int(r[0]) for r in rows}
+    if not seen:
+        return items
+    kept = [it for it in items if int(it["id"]) not in seen]
+    log.info("digest.dedup_dropped", dropped=len(items) - len(kept))
+    return kept
+
+
+def build_digest(interest_id: int, date: str = "", rebuild: bool = False) -> int | None:
+    """构建一份摘要。UNIQUE(interest_id, digest_date) 保证幂等。
+
+    `rebuild=True` 用于网页上的「立刻推荐」：当日摘要已存在时**重算并覆盖**
+    它的条目，而不是直接返回旧摘要（否则用户点了没反应）。
+
+    重算时的两条硬约束：
+    1. **不再入队邮件**。用户主动点的「立刻推荐」只是想让站内列表刷新，
+       不该在深夜给他发一封邮件；邮件仍由每日调度按 `send_at` 统一发出。
+    2. **不重复推送已发过的论文**。已 `mark_sent` 的论文会从候选中剔除
+       （`rank_papers` 内部按 user_papers 去重），所以反复点「立刻推荐」
+       也不会把同一篇论文反复塞进邮件。
+    """
     with SessionLocal() as session:
         interest = session.get(Interest, interest_id)
         if interest is None or not interest.is_active:
@@ -75,24 +120,35 @@ def build_digest(interest_id: int, date: str = "") -> int | None:
     digest_date = date or today_local(tz)
 
     with SessionLocal() as session:
-        exists = (
+        existing = (
             session.query(Digest)
             .filter(Digest.interest_id == interest_id, Digest.digest_date == digest_date)
             .first()
         )
-        if exists:
-            return int(exists.id)
-        row = Digest(
-            user_id=user_id,
-            interest_id=interest_id,
-            digest_date=digest_date,
-            status="pending",
-            item_count=0,
-            created_at=utc_iso(),
-        )
-        session.add(row)
-        session.commit()
-        digest_id = int(row.id)
+        if existing is not None and not rebuild:
+            return int(existing.id)
+        if existing is not None:
+            # 重算：清空旧条目后原地重填，保持 digest_id 不变，
+            # 这样已生成的免登录链接（评/退订）仍然有效。
+            digest_id = int(existing.id)
+            session.query(DigestItem).filter(
+                DigestItem.digest_id == digest_id
+            ).delete(synchronize_session=False)
+            existing.status = "pending"
+            existing.item_count = 0
+            session.commit()
+        else:
+            row = Digest(
+                user_id=user_id,
+                interest_id=interest_id,
+                digest_date=digest_date,
+                status="pending",
+                item_count=0,
+                created_at=utc_iso(),
+            )
+            session.add(row)
+            session.commit()
+            digest_id = int(row.id)
 
     try:
         with SessionLocal() as session:
@@ -107,6 +163,14 @@ def build_digest(interest_id: int, date: str = "") -> int | None:
         raise
 
     items = [it for it in items if int(it.get("llm_score", 0)) >= min_score][:max_items]
+
+    # 硬去重：**已进入过摘要的论文不再重复进邮件**。
+    #
+    # `rank_papers` 里对已推论文只做 -0.5 降权而非排除，所以高分的旧论文
+    # 仍可能在多天后的摘要里再次出现。用户明确要求「每日多次推荐不会
+    # 推送邮箱里重复的论文」，故在入摘要这一层做硬过滤。
+    # 站内列表不受影响 —— 它读的是 llm_scores 与摘要条目，论文仍在流里。
+    items = _exclude_already_digested(user_id, digest_id, items)
 
     with SessionLocal() as session:
         for pos, it in enumerate(items):
@@ -128,7 +192,7 @@ def build_digest(interest_id: int, date: str = "") -> int | None:
 
     mark_sent(user_id, [int(it["id"]) for it in items])
 
-    if items:
+    if items and not rebuild:
         payload = render_digest_payload(digest_id)
         if payload:
             from app.pipeline.deliver import enqueue_digest
@@ -142,7 +206,13 @@ def build_digest(interest_id: int, date: str = "") -> int | None:
         interest.next_due_at = compute_next_due(interest.send_at, interest.timezone)
         session.commit()
 
-    log.info("digest.built", id=digest_id, interest=interest_id, items=len(items))
+    log.info(
+        "digest.built",
+        id=digest_id,
+        interest=interest_id,
+        items=len(items),
+        rebuild=rebuild,
+    )
     return digest_id
 
 

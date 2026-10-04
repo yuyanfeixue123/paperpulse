@@ -1,0 +1,86 @@
+{% extends "layouts/base.html" %}
+{% block title %}编辑 {{ interest.name }} · PaperPulse{% endblock %}
+{% block content %}
+<div class="row" style="margin-bottom:16px">
+  <h1 style="margin:0">编辑订阅</h1>
+  <span class="badge">v{{ interest.version }}</span>
+  <div class="spacer"></div>
+  <a class="btn secondary small" href="/interests/{{ interest.id }}">返回详情</a>
+  <a class="btn secondary small" href="/interests">返回列表</a>
+</div>
+
+<div class="notice">
+  改动<strong>描述</strong>后，AI 会重新解析你的研究兴趣并增删关键词；
+  只改关键词或推送参数则直接保存。两种方式都会记入修订历史，可随时回滚。
+</div>
+
+<form method="post" action="/interests/{{ interest.id }}/edit">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <div class="card">
+    <h2>研究方向</h2>
+    <div class="field">
+      <label>兴趣描述</label>
+      <textarea name="description" rows="4">{{ interest.description }}</textarea>
+      <p class="small muted">改这里会让 AI 重新理解你的方向，例如补充「加上骑行可达性相关的研究」。</p>
+    </div>
+    <label class="small">
+      <input type="checkbox" name="use_llm" value="1" checked>
+      让 AI 重新解析（取消勾选则直接按下方关键词保存）
+    </label>
+  </div>
+
+  <div class="card">
+    <h2>关键词</h2>
+    <p class="small muted">点标签加入或移除，也可直接输入（逗号分隔）。</p>
+    <div class="field">
+      <label>必须包含</label>
+      <input type="text" name="include_keywords" id="inc-kw"
+             value="{{ profile.include_keywords | join(', ') }}">
+      <div class="kw-picker" id="inc-kw-picker"></div>
+    </div>
+    <div class="field">
+      <label>明确排除</label>
+      <input type="text" name="exclude_keywords" id="exc-kw"
+             value="{{ profile.exclude_keywords | join(', ') }}">
+      <div class="kw-picker" id="exc-kw-picker"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>推送设置</h2>
+    <div class="grid2">
+      <div class="field">
+        <label>每日篇数（1–50）</label>
+        <input type="number" name="max_papers_per_day" min="1" max="50"
+               value="{{ interest.max_papers_per_day }}">
+      </div>
+      <div class="field">
+        <label>最低相关度（0–5）</label>
+        <input type="number" name="min_score" min="0" max="5" value="{{ interest.min_score }}">
+      </div>
+      <div class="field">
+        <label>回看天数（1–30）</label>
+        <input type="number" name="lookback_days" min="1" max="30" value="{{ interest.lookback_days }}">
+      </div>
+      <div class="field">
+        <label>推送时间</label>
+        <input type="text" name="send_at" value="{{ interest.send_at }}" placeholder="08:30">
+      </div>
+      <div class="field">
+        <label>时区</label>
+        <select name="timezone">
+          {% for tz in timezones %}
+            <option value="{{ tz }}" {% if tz == interest.timezone %}selected{% endif %}>{{ tz }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <button type="submit">保存修改</button>
+</form>
+
+<script id="kw-presets" type="application/json">{{ keyword_presets | tojson }}</script>
+<script src="{{ static('form-enhance.js') }}"></script>
+{% endblock %}

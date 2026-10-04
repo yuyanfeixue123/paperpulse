@@ -111,7 +111,78 @@ def user_detail(request: Request, user_id: int):
         recent=recent,
         csrf=csrf_for(request),
         active_days=ACTIVE_WITHIN_DAYS,
+        quota=_quota_info(user_id),
     )
+
+
+def _quota_info(user_id: int) -> dict:
+    """用户的额度设置 + 当前生效值，供后台展示。"""
+    from app.core.db import SessionLocal
+    from app.core.quota import effective_limits
+    from app.models.user import User
+
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if user is None:
+            return {}
+        set_email = user.daily_email_quota
+        set_reco = user.daily_recommend_quota
+        unlimited = bool(user.email_quota_unlimited)
+    effective = effective_limits(user_id)
+    return {
+        "daily_email_quota": set_email,
+        "daily_recommend_quota": set_reco,
+        "email_quota_unlimited": unlimited,
+        "effective_email": effective["emails_per_day"],
+        "effective_reco": effective["recommend_runs_per_day"],
+        "has_own_key": bool(user.llm_base_url and user.llm_api_key_enc),
+    }
+
+
+@router.post("/admin/users/{user_id}/quota")
+def set_user_quota(
+    request: Request,
+    user_id: int,
+    daily_email_quota: str = Form(""),
+    daily_recommend_quota: str = Form(""),
+    email_quota_unlimited: str = Form(""),
+    csrf: str = Form(""),
+):
+    """为单个用户设置每日额度。
+
+    留空表示「跟随系统默认」—— 这样管理员调整全局默认时，
+    未单独配置的用户会自动跟随，不必逐个改。
+    """
+    guard, _ = _guard(request)
+    if guard:
+        return guard
+    if not check_csrf(request, csrf):
+        return RedirectResponse(f"/admin/users/{user_id}", status_code=303)
+
+    from app.core.db import SessionLocal
+    from app.models.user import User
+
+    def _parse(raw: str) -> int | None:
+        raw = (raw or "").strip()
+        if not raw:
+            return None
+        try:
+            value = int(raw)
+        except ValueError:
+            return None
+        return value if value >= 0 else None
+
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if user is None:
+            return RedirectResponse("/admin/users", status_code=303)
+        user.daily_email_quota = _parse(daily_email_quota)
+        user.daily_recommend_quota = _parse(daily_recommend_quota)
+        user.email_quota_unlimited = 1 if email_quota_unlimited else 0
+        session.add(user)
+        session.commit()
+    _flash(request, "额度已保存")
+    return RedirectResponse(f"/admin/users/{user_id}", status_code=303)
 
 
 @router.post("/admin/users/{user_id}/delete")

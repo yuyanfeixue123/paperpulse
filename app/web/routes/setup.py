@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
+from sqlalchemy import text as sql
 
 from app.core.config import get_settings, reload_settings
 from app.core.db import SessionLocal
@@ -23,6 +24,29 @@ from app.web.templates import render
 router = APIRouter()
 
 
+def _require_unconfigured(request: Request):
+    """未完成部署引导时，setup 端点只允许「已登录的站点管理员」或「完全未初始化」两种情形。
+
+    修复的漏洞：此前六个 POST 端点零校验，攻击者填任意邮箱即可把该账号密码改掉
+    并提权为管理员（接管），或改写全局 LLM / 邮件通道。
+    现在：
+    - 引导已完成 → 一律拒绝（引导是一次性动作）
+    - 已有账号 → 必须携带管理员会话
+    - 库为空（全新部署）→ 允许首位管理员自举
+    """
+    from app.web.deps import current_admin
+
+    if wizard.setup_completed():
+        return RedirectResponse("/admin", status_code=303)
+
+    with SessionLocal() as session:
+        user_count = int(session.execute(sql("SELECT COUNT(*) FROM users")).scalar() or 0)
+
+    if user_count > 0 and current_admin(request) is None:
+        return RedirectResponse("/login", status_code=303)
+    return None
+
+
 def _flash(request: Request, msg: str, kind: str = "") -> None:
     """设置一次性提示语。
 
@@ -35,6 +59,12 @@ def _flash(request: Request, msg: str, kind: str = "") -> None:
 
 @router.get("/admin/setup")
 def setup_page(request: Request):
+    # 引导完成后不再提供任何可写入口，直接去后台
+    if wizard.setup_completed():
+        from app.web.deps import current_admin
+
+        return RedirectResponse("/admin" if current_admin(request) else "/login",
+                                status_code=303)
     step = wizard.current_step()
     ctx = wizard.setup_context()
     ctx.update({"csrf": csrf_for(request)})
@@ -91,7 +121,7 @@ def setup_1(
     wizard.update(default_timezone=timezone)
     wizard.advance_to(2)
     resp = RedirectResponse("/admin/setup", status_code=303)
-    set_session(resp, uid)
+    set_session(resp, uid, request)
     return resp
 
 
@@ -103,6 +133,9 @@ def setup_2(
     timezone: str = Form("Asia/Shanghai"),
     csrf: str = Form(""),
 ):
+    guard = _require_unconfigured(request)
+    if guard:
+        return guard
     if not check_csrf(request, csrf):
         return RedirectResponse("/admin/setup", status_code=303)
     wizard.update(
@@ -179,6 +212,9 @@ def setup_4(
     daily_budget: str = Form("250"),
     csrf: str = Form(""),
 ):
+    guard = _require_unconfigured(request)
+    if guard:
+        return guard
     if not check_csrf(request, csrf):
         return RedirectResponse("/admin/setup", status_code=303)
     cfg = dict(PRESETS.get(kind, {}))
@@ -219,6 +255,9 @@ def setup_4(
 
 @router.post("/admin/setup/5")
 def setup_5(request: Request, enabled: list[str] = Form([]), csrf: str = Form("")):
+    guard = _require_unconfigured(request)
+    if guard:
+        return guard
     if not check_csrf(request, csrf):
         return RedirectResponse("/admin/setup", status_code=303)
     for spec in load_all_specs():

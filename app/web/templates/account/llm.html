@@ -12,6 +12,17 @@
   {% else %}
     <div class="card">
       <h1>配置你的 LLM API Key</h1>
+      {% if welcome %}
+        <div class="notice">
+          <strong>建议现在就配置自己的 Key。</strong>带来的好处：
+          <ul style="margin:8px 0 0 18px">
+            <li>你的推荐消耗<strong>你自己的</strong>额度，不占用站点共享额度</li>
+            <li>不受「每日立刻推荐次数」限制</li>
+            <li>站点全局 Key 失效时你仍可正常使用</li>
+          </ul>
+          任何厂商的 Key 都行，配置只需一次。
+        </div>
+      {% endif %}
       <p class="muted">{{ reason_text or '创建订阅需要 AI 解析与论文精排，请先配置一个 LLM API Key。' }}</p>
 
       {% if global_ready %}
@@ -70,16 +81,5 @@
   {% endif %}
 </div>
 
-<script>
-function applyPreset(provider) {
-  const sel = document.querySelector('select[name=provider]');
-  const opt = sel.options[sel.selectedIndex];
-  document.getElementById('base_url').value = opt.dataset.url || '';
-  document.getElementById('model').value = opt.dataset.model || '';
-}
-document.addEventListener('DOMContentLoaded', () => {
-  const sel = document.querySelector('select[name=provider]');
-  if (sel && !document.getElementById('base_url').value) applyPreset(sel.value);
-});
-</script>
+<script src="{{ static('llm-preset.js') }}"></script>
 {% endblock %}

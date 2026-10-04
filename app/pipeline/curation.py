@@ -70,7 +70,17 @@ def invalidate_library_cache() -> None:
     _lib_cache = None
 
 
+MAX_PATTERN_LEN = 200
+# 嵌套量词是灾难性回溯（ReDoS）的主要形态；单进程被卡住等于全站停摆
+_REDOS_HINT = re.compile(r"(\(.+\)[*+]){2,}|\{[0-9,]+\}\[0-9]")
+
+
 def _patterns() -> list[re.Pattern[str]]:
+    """编译管理员配置的正则。
+
+    防护：长度上限 + 拒绝典型 ReDoS 构造。管理员误配一条灾难性回溯正则
+    会卡死整个单进程流水线，因此宁可丢弃该条并告警。
+    """
     from app.core.config import get_settings
 
     raw: list[str] = get_settings().email.content_filter_patterns or []
@@ -78,6 +88,12 @@ def _patterns() -> list[re.Pattern[str]]:
     for item in raw:
         pattern = str(item).strip()
         if not pattern:
+            continue
+        if len(pattern) > MAX_PATTERN_LEN:
+            log.warning("curation.pattern_too_long", length=len(pattern))
+            continue
+        if _REDOS_HINT.search(pattern):
+            log.warning("curation.redos_suspect", pattern=pattern[:60])
             continue
         try:
             out.append(re.compile(pattern, re.IGNORECASE))

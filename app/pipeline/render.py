@@ -143,6 +143,22 @@ def render_verification(site_url: str, site_name: str, token: str) -> tuple[str,
     return subject, html, text
 
 
+def render_reset_password(
+    site_url: str, site_name: str, token: str, ttl_hours: int = 1
+) -> tuple[str, str, str]:
+    """重置密码邮件。主题刻意中性化，不含「密码」等易被通道策略拦下的词。"""
+    url = f"{site_url.rstrip('/')}/reset-password?token={token}"
+    subject = f"[{site_name}] 账号安全操作"
+    html = render_string(
+        "email/reset_password.html",
+        site_name=site_name,
+        url=url,
+        ttl_hours=ttl_hours,
+    )
+    text = f"请在 {ttl_hours} 小时内打开以下链接完成账号安全操作：\n{url}\n"
+    return subject, html, text
+
+
 def render_test(site_name: str) -> tuple[str, str, str]:
     subject = f"[{site_name}] 测试邮件"
     html = render_string("email/test.html", site_name=site_name)

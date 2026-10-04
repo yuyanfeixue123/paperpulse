@@ -113,6 +113,102 @@ def test_encryption_roundtrip():
     assert decrypt_value(encrypt_value("secret-key")) == "secret-key"
 
 
+def test_session_cookie_secure_only_on_https(db):
+    """回归：会话 cookie 不得无条件带 Secure。
+
+    浏览器/httpx 在 HTTP 连接下会**拒收** Secure cookie，一旦无条件置位，
+    未配 TLS 的部署（内网直连、裸机 HTTP）会表现为「登录成功 → 立刻被登出」，
+    且日志里完全看不出原因。正确做法是：确定 HTTPS 才加 Secure。
+    """
+    from fastapi import Request
+
+    from app.core.security import hash_password
+    from app.core.utils import utc_iso
+    from app.models.user import User
+    from app.web.deps import request_is_https
+
+    def _req(scheme: str, xfp: str = "") -> Request:
+        raw = [(b"host", b"x")]
+        if xfp:
+            raw.append((b"x-forwarded-proto", xfp.encode()))
+        return Request({"type": "http", "method": "GET", "path": "/",
+                        "headers": raw, "scheme": scheme,
+                        "query_string": b"", "server": ("x", 80)})
+
+    assert request_is_https(_req("https")) is True
+    assert request_is_https(_req("http", "https")) is True
+    assert request_is_https(_req("http", "https,http")) is True  # 多级反代
+    assert request_is_https(_req("http")) is False
+    assert request_is_https(_req("http", "http")) is False
+    assert request_is_https(None) is False
+
+    with db() as s:
+        s.add(User(email="sec@example.com", username="secu",
+                   password_hash=hash_password("Passw0rd!x"), created_at=utc_iso()))
+        s.commit()
+    _complete_setup()
+
+    c = _client()
+    r = c.post("/login", data={"email": "secu", "password": "Passw0rd!x",
+                               "csrf": _extract_csrf(c.get("/login").text)},
+               follow_redirects=False)
+    cookie = r.headers.get("set-cookie", "")
+    assert "Secure" not in cookie, f"HTTP 下不应带 Secure：{cookie}"
+    # 端到端：HTTP 访问时登录态必须真正可用
+    assert c.get("/account", follow_redirects=False).status_code == 200
+
+    # 反代终结 TLS 的生产形态：XFP=https 时必须带 Secure
+    c2 = _client()
+    r2 = c2.post("/login", data={"email": "secu", "password": "Passw0rd!x",
+                                 "csrf": _extract_csrf(c2.get("/login").text)},
+                 follow_redirects=False,
+                 headers={"x-forwarded-proto": "https"})
+    assert "Secure" in r2.headers.get("set-cookie", "")
+
+
+def test_session_cookie_invalidated_by_password_change(db):
+    """回归：改密后旧会话必须立即失效（否则无法踢下线）。"""
+    from starlette.responses import Response
+
+    from app.core.security import hash_password
+    from app.core.utils import utc_iso
+    from app.models.user import User
+    from app.web.deps import SESSION_COOKIE, clear_session, set_session
+
+    with db() as s:
+        s.add(User(email="rot@example.com", username="rotu",
+                   password_hash=hash_password("Passw0rd!x"), created_at=utc_iso()))
+        s.commit()
+
+    old = Response()
+    set_session(old, 1)
+    old_token = old.headers["set-cookie"].split(";")[0].split("=", 1)[1]
+    assert SESSION_COOKIE  # cookie 名常量存在
+
+    from app.core.security import session_valid
+
+    assert session_valid(old_token) is not None
+
+    # 模拟改密：password_changed_at 前移
+    with db() as s:
+        u = s.get(User, 1)
+        u.password_changed_at = utc_iso()
+        s.add(u)
+        s.commit()
+
+    assert session_valid(old_token) is None, "改密后旧 token 必须失效"
+
+    fresh = Response()
+    set_session(fresh, 1)
+    new_token = fresh.headers["set-cookie"].split(";")[0].split("=", 1)[1]
+    assert session_valid(new_token) is not None
+
+    cleared = Response()
+    clear_session(cleared)
+    assert "Max-Age=0" in cleared.headers["set-cookie"] or \
+        cleared.headers["set-cookie"].startswith(f'{SESSION_COOKIE}=""')
+
+
 def test_purge_respects_retention(db):
     from datetime import timedelta
 

@@ -69,14 +69,5 @@
 </div>
 {% endfor %}
 
-<script>
-async function checkSource(form, key) {
-  event.preventDefault();
-  const fd = new FormData(form);
-  const res = await fetch('/admin/sources/check', {method:'POST', body: fd});
-  const data = await res.json();
-  alert(key + '：' + data.message);
-  return false;
-}
-</script>
+<script src="{{ static('source-check.js') }}"></script>
 {% endblock %}

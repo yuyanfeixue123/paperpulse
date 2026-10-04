@@ -19,6 +19,10 @@ class SystemSettings(Base):
     retention_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     purge_scope: Mapped[str] = mapped_column(Text, nullable=False, default="all")
     max_pool_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=200000)
+    # 注册策略：open=开放注册 / closed=仅管理员建号。默认 open（单机自部署
+    # 场景下自助注册更合理），但**有账号后即可关闭** —— 审计指出此前
+    # /register 完全无开关，等于任何人都能在公网实例上批量注册。
+    registration_mode: Mapped[str] = mapped_column(Text, nullable=False, default="open")
     updated_at: Mapped[str] = mapped_column(Text, nullable=False)
 
 

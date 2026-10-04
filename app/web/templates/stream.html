@@ -1,0 +1,73 @@
+{% extends "layouts/base.html" %}
+{% block title %}推荐流 · PaperPulse{% endblock %}
+{% block content %}
+<div class="row" style="margin-bottom:16px">
+  <h1 style="margin:0">推荐流</h1>
+  <span class="badge">{{ today }}</span>
+  <div class="spacer"></div>
+  <a class="btn secondary small" href="/feed">按订阅分组</a>
+  <a class="btn secondary small" href="/interests">我的订阅</a>
+  <a class="btn secondary small" href="/">返回首页</a>
+</div>
+
+{% if not interests %}
+  <div class="card">
+    <p class="muted">你还没有订阅。创建订阅后，这里会按你所有兴趣点的 AI 打分，
+       混合成一条连续的推荐流，数量不限。</p>
+    <a class="btn" href="/interests/new">新建订阅</a>
+  </div>
+{% else %}
+<div class="notice">
+  这里是<strong>混合推荐流</strong>：把你所有订阅命中的论文放在一起，
+  按各订阅内的 AI 打分从高到低排列。同一篇论文被多个订阅命中时取最高分，
+  并标注命中它的订阅。总共 <strong>{{ total }}</strong> 篇，数量不限。
+</div>
+
+{% if not items %}
+  <div class="card">
+    <p class="muted">推荐流还是空的。等今天的推荐生成后，或点一下
+       <a href="/feed">「立刻推荐」</a>，论文就会出现在这里。</p>
+  </div>
+{% endif %}
+
+{% for it in items %}
+<div class="card">
+  <div class="row" style="align-items:flex-start">
+    <div style="flex:1">
+      <div style="font-weight:600;font-size:15px;margin-bottom:4px">
+        <a href="{{ it.doi and ('https://doi.org/' ~ it.doi) or it.url }}" target="_blank" rel="noopener">{{ it.title }}</a>
+      </div>
+      <div class="small muted">
+        {{ it.authors[:3] | join(', ') }}{% if it.authors|length > 3 %} 等{% endif %}
+        {% if it.venue %} · {{ it.venue }}{% endif %}
+        {% if it.published_at %} · {{ it.published_at }}{% endif %}
+      </div>
+      <div style="margin-top:6px">
+        <span class="stars">{{ it.stars }}</span>
+        <span class="small muted"> AI 打分 {{ it.llm_score }}/5</span>
+        {% for n in it.interest_names %}<span class="chip">{{ n }}</span>{% endfor %}
+        {% if it.hit_count > 1 %}
+          <span class="badge ok">{{ it.hit_count }} 个订阅同时命中</span>
+        {% endif %}
+      </div>
+    </div>
+    <div style="text-align:right;white-space:nowrap">
+      {% if it.doi %}
+        <div class="small"><a href="https://doi.org/{{ it.doi }}" target="_blank" rel="noopener">DOI</a></div>
+        <div class="small muted" style="font-size:11px">{{ it.doi }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% if it.summary %}<p style="margin:10px 0 0;color:#4b5563">{{ it.summary }}</p>{% endif %}
+</div>
+{% endfor %}
+
+{% if has_more %}
+<div class="row" style="justify-content:center;margin:18px 0">
+  <a class="btn secondary" href="/stream?limit={{ limit }}&offset={{ offset + limit }}">加载更多</a>
+</div>
+{% elif items %}
+<p class="small muted" style="text-align:center">—— 已经到底了（共 {{ total }} 篇）——</p>
+{% endif %}
+{% endif %}
+{% endblock %}

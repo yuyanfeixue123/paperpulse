@@ -146,7 +146,11 @@ def test_feed_shows_ranked_items(db):
     r = c.get("/feed")
     assert r.status_code == 200
     assert "今日推荐" in r.text
-    assert "按相关度从高到低排序" in r.text
+    # 分组视图：每个订阅各占一组，页头说明站内列表不受邮件限制
+    assert "按订阅依次展示今日推荐" in r.text
+    assert "站内列表不受影响" in r.text
+    # 「立刻推荐」入口必须在（受每日次数限制）
+    assert "/feed/recommend" in r.text
     reload_settings()
 
 

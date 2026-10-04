@@ -7,8 +7,17 @@ Wants=network-online.target
 Type=notify
 User=paperpulse
 WorkingDirectory=/opt/paperpulse
-Environment=PAPERPULSE_SECRET_KEY=
-Environment=PAPERPULSE_ENCRYPTION_KEY=
+
+# 密钥与数据库地址一律从 /opt/paperpulse/.env 读取。
+#
+# 曾经的写法是 `Environment=PAPERPULSE_SECRET_KEY=`（空值）。这有两个问题：
+#   1. systemd 的 Environment 会**覆盖** .env 里的同名变量，等于把真密钥抹成空串；
+#   2. 应用已改为「生产环境缺密钥即拒绝启动」，于是服务直接起不来，
+#      而 journal 里只有一句 RuntimeError，看不出根因。
+# EnvironmentFile 不存在时用 `-` 前缀忽略，避免首次部署因缺文件而失败 ——
+# 但那种情况下应用会在启动日志里明确报出缺哪个变量。
+EnvironmentFile=-/opt/paperpulse/.env
+
 ExecStart=/opt/paperpulse/.venv/bin/python -m app.main
 Restart=always
 RestartSec=10
@@ -21,6 +30,16 @@ CPUQuota=80%
 StandardOutput=journal
 StandardError=journal
 TimeoutStopSec=150
+
+# 只读挂载整个 /opt/paperpulse，仅放开两处确实要写的地方：
+#   data/          —— SQLite 及其 -wal/-shm
+#   config/        —— 后台保存设置时会回写 config.yaml
+# 漏掉 config/ 会让「保存设置」全部静默失败（写只读文件系统抛错）。
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ReadWritePaths=/opt/paperpulse/data /opt/paperpulse/config
 
 [Install]
 WantedBy=multi-user.target

@@ -29,6 +29,11 @@
     每日 {{ it.max_papers_per_day }} 篇 · 阈值 {{ it.min_score }} ·
     推送 {{ it.send_at }}（{{ it.timezone }}）· 版本 v{{ it.version }}
   </p>
+  <div class="row" style="margin-top:10px">
+    <a class="btn secondary small" href="/interests/{{ it.id }}">详情</a>
+    <a class="btn small" href="/interests/{{ it.id }}/edit">编辑</a>
+    <a class="btn secondary small" href="/feed?interest_id={{ it.id }}">看今日推荐</a>
+  </div>
 </div>
 {% endfor %}
 {% endblock %}

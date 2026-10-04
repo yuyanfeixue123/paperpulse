@@ -28,19 +28,19 @@
 
   <div class="card">
     <h2>关键词</h2>
+    <p class="small muted">点下方标签即可加入或移除；也可以直接在输入框里自由输入（用逗号分隔）。</p>
     <div class="field">
-      <label>必须包含（逗号分隔）</label>
-      <input type="text" name="include_keywords" value="{{ profile.include_keywords | join(', ') }}">
+      <label>必须包含</label>
+      <input type="text" name="include_keywords" id="inc-kw"
+             value="{{ profile.include_keywords | join(', ') }}">
+      <div class="kw-picker" id="inc-kw-picker"></div>
     </div>
     <div class="field">
-      <label>明确排除（逗号分隔）</label>
-      <input type="text" name="exclude_keywords" value="{{ profile.exclude_keywords | join(', ') }}">
+      <label>明确排除</label>
+      <input type="text" name="exclude_keywords" id="exc-kw"
+             value="{{ profile.exclude_keywords | join(', ') }}">
+      <div class="kw-picker" id="exc-kw-picker"></div>
     </div>
-    {% if profile.include_keywords %}
-      <div>
-        {% for k in profile.include_keywords %}<span class="chip">{{ k }}</span>{% endfor %}
-      </div>
-    {% endif %}
   </div>
 
   <div class="card">
@@ -130,14 +130,7 @@
   <button type="submit" onclick="syncQueries()">保存订阅</button>
 </form>
 
-<script>
-function syncQueries() {
-  const q = {};
-  const a = document.getElementById('q_arxiv').value.trim();
-  const o = document.getElementById('q_openalex').value.trim();
-  if (a) q.arxiv = a;
-  if (o) q.openalex = o;
-  document.getElementById('queries').value = JSON.stringify(q);
-}
-</script>
+<script id="kw-presets" type="application/json">{{ keyword_presets | tojson }}</script>
+<script src="{{ static('interest-queries.js') }}"></script>
+<script src="{{ static('form-enhance.js') }}"></script>
 {% endblock %}

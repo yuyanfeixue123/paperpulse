@@ -76,6 +76,15 @@ def save_llm(
     if not check_csrf(request, csrf):
         return RedirectResponse("/admin/llm", status_code=303)
 
+    from app.core.urlguard import UnsafeURL, safe_base_url
+
+    if base_url.strip():
+        try:
+            base_url = safe_base_url(base_url)
+        except UnsafeURL as exc:
+            _flash(request, f"Base URL 被拒绝：{exc}", "error")
+            return RedirectResponse("/admin/llm", status_code=303)
+
     cfg_path = ROOT / "config" / "config.yaml"
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
     data.setdefault("llm", {})

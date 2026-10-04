@@ -32,6 +32,17 @@ from app.web.routes import (
 
 log = get_logger(__name__)
 
+
+def _setup_pending() -> bool:
+    """引导是否仍未完成。读失败时返回 False —— 失败不该把人放到 setup 页。"""
+    try:
+        with SessionLocal() as session:
+            row = session.get(SystemSettings, 1)
+            return not (row and row.setup_completed_at)
+    except Exception:  # noqa: BLE001
+        log.warning("gate.setup_state_unknown")
+        return False
+
 EXEMPT_PREFIXES = ("/login", "/register", "/verify", "/logout", "/static", "/healthz", "/f/", "/u/")
 
 
@@ -83,8 +94,21 @@ def register_routes(app: FastAPI) -> None:
     @app.middleware("http")
     async def setup_gate(request: Request, call_next):
         path = request.url.path
-        if path.startswith(EXEMPT_PREFIXES) or path.startswith("/admin/setup"):
+        # setup 不再无条件豁免：仅在「引导未完成」时放行，
+        # 否则任何访客都能打 /admin/setup/* 改密码、提权、改全局凭据。
+        if path.startswith(EXEMPT_PREFIXES):
             return await call_next(request)
+        if path.startswith("/admin/setup"):
+            if _setup_pending():
+                return await call_next(request)
+            with SessionLocal() as session:
+                row = session.get(SystemSettings, 1)
+                if not (row and row.setup_completed_at):
+                    return await call_next(request)
+            from app.web.deps import current_admin
+
+            return RedirectResponse("/admin" if current_admin(request) else "/login",
+                                    status_code=303)
 
         completed = False
         llm_mode = "keyword"

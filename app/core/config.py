@@ -130,6 +130,16 @@ class DiskConfig(BaseModel):
     usage_hard_pct: int = 90
 
 
+class QuotaConfig(BaseModel):
+    """每用户资源上限。0 = 不限。"""
+
+    llm_calls_per_day: int = 200
+    emails_per_day: int = 20
+    max_interests: int = 20
+    # 每日「立刻推荐」次数上限（控 token 成本）；自带 Key 的用户不受此限
+    recommend_runs_per_day: int = 3
+
+
 class Settings(BaseModel):
     run_mode: str = "lite"
     web: WebConfig = Field(default_factory=WebConfig)
@@ -143,6 +153,7 @@ class Settings(BaseModel):
     site: SiteConfig = Field(default_factory=SiteConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     disk: DiskConfig = Field(default_factory=DiskConfig)
+    quota: QuotaConfig = Field(default_factory=QuotaConfig)
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:

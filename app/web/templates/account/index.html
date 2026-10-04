@@ -43,6 +43,41 @@
   </form>
 </div>
 
+{% if quota %}
+{% set q = quota.as_dict() %}
+<div class="card">
+  <h2>今日用量与限额</h2>
+  <p class="small muted">每天 0 点（UTC）自动重置。站内浏览与推荐流不受邮件额度影响；
+     用尽邮件额度后仍可正常使用网站。</p>
+  <table>
+    <tr>
+      <th>AI 调用</th>
+      <td>{{ q.llm_calls }} / {{ '不限' if q.llm_unlimited else q.llm_limit }}</td>
+    </tr>
+    <tr>
+      <th>推送邮件</th>
+      <td>{{ q.emails }} / {{ '不限' if q.email_unlimited else q.email_limit }}</td>
+    </tr>
+    <tr>
+      <th>立刻推荐</th>
+      <td>
+        {{ q.recommend_runs }} / {{ '不限' if q.recommend_unlimited else q.recommend_limit }}
+        {% if q.uses_own_key %}
+          <span class="badge ok" style="margin-left:6px">已用自己的 Key，不受限</span>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+  {% if not q.uses_own_key %}
+    <p class="small muted" style="margin-top:10px">
+      想彻底摆脱这些限制？去
+      <a href="/account/llm?next=/account">配置自己的 API Key</a>
+      —— 推荐消耗你自己的额度，不占站点资源。
+    </p>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="card">
   <h2>推送默认值</h2>
   <p class="small muted">

@@ -7,7 +7,7 @@ from app.models.paper import Paper
 from app.models.score import LlmScore, LlmUsage
 from app.models.system import Source, SourceCredential, SystemSettings
 from app.models.task import FetchJob, TaskRun
-from app.models.user import User
+from app.models.user import User, UserQuotaUsage
 
 __all__ = [
     "Base",
@@ -30,5 +30,6 @@ __all__ = [
     "SystemSettings",
     "TaskRun",
     "User",
+    "UserQuotaUsage",
     "UserPaper",
 ]

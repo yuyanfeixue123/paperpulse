@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import hashlib
-import ipaddress
 import re
 from collections.abc import Iterator
 from urllib.parse import urlparse
@@ -17,6 +16,7 @@ from urllib.parse import urlparse
 import feedparser
 
 from app.core.http import conditional_get
+from app.core.urlguard import UnsafeURL, resolve_and_check
 from app.core.utils import parse_iso, title_hash, utc_iso
 from app.sources.base import PaperItem, SourceBase
 
@@ -24,38 +24,15 @@ _etag_cache: dict[str, str] = {}
 _last_modified_cache: dict[str, str] = {}
 
 
-def is_safe_url(url: str) -> tuple[bool, str]:
-    """SSRF 校验：仅 http/https，拒绝内网 / 回环 / 链路本地地址。"""
-    try:
-        parts = urlparse(url)
-    except Exception:
-        return False, "URL 解析失败"
-    if parts.scheme not in ("http", "https"):
-        return False, "仅支持 http/https"
-    host = parts.hostname or ""
-    if not host:
-        return False, "缺少主机名"
-    try:
-        ip = ipaddress.ip_address(host)
-    except ValueError:
-        return True, ""
-    if (
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_reserved
-        or ip.is_multicast
-    ):
-        return False, "拒绝内网/回环地址"
-    return True, ""
 
 
 class RssSource(SourceBase):
     def fetch(self, start_date: str, end_date: str, params: dict) -> Iterator[PaperItem]:
         url = params.get("url") or self.url_template
-        ok, reason = is_safe_url(url)
-        if not ok:
-            raise ValueError(f"源 {self.key} 的 URL 不安全：{reason}")
+        try:
+            resolve_and_check(url)
+        except UnsafeURL as exc:
+            raise ValueError(f"源 {self.key} 的 URL 被拒绝：{exc}") from exc
 
         resp = conditional_get(
             url,

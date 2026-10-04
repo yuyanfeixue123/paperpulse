@@ -284,11 +284,18 @@ def apply_patch(interest_id: int, patch: dict) -> int:
         return from_version + 1
 
 
-def rollback_to(interest_id: int, target_version: int) -> bool:
-    """回滚到指定版本：按历史 patch 逆序撤销到目标版本。"""
+def rollback_to(interest_id: int, target_version: int, user_id: int | None = None) -> bool:
+    """回滚到指定版本：按历史 patch 逆序撤销到目标版本。
+
+    修复的漏洞：此前无属主校验，任何登录用户可按 id 篡改他人订阅画像（IDOR）。
+    传入 user_id 时强制校验归属。
+    """
     with SessionLocal() as session:
         interest = session.get(Interest, interest_id)
         if interest is None:
+            return False
+        if user_id is not None and int(interest.user_id) != int(user_id):
+            log.warning("revise.rollback_forbidden", interest=interest_id, user=user_id)
             return False
         if int(interest.version) <= target_version:
             return False

@@ -11,4 +11,23 @@
   <pre class="small muted" style="white-space:pre-wrap;margin:6px 0 0">{{ r.detail }}</pre>
 </div>
 {% endfor %}
+
+<div class="card">
+  <h2>站点访问控制</h2>
+  <form method="post" action="/admin/system/registration">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="field">
+      <label>自助注册</label>
+      <select name="registration_mode">
+        <option value="open" {% if registration_mode != 'closed' %}selected{% endif %}>开放 —— 任何人可自助注册</option>
+        <option value="closed" {% if registration_mode == 'closed' %}selected{% endif %}>关闭 —— 仅管理员创建账号</option>
+      </select>
+      <p class="small muted">
+        当前共 {{ user_count }} 个账号。关闭后，已注册用户登录不受影响；
+        系统内一个账号都没有时自助引导始终可用，避免把自己锁在门外。
+      </p>
+    </div>
+    <button type="submit">保存</button>
+  </form>
+</div>
 {% endblock %}

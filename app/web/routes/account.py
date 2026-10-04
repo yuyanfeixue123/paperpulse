@@ -38,8 +38,15 @@ def account_page(request: Request):
     guard = login_required(request)
     if guard:
         return guard
+    from app.core.quota import snapshot
+
+    user = must_user(request)
     return render(
-        request, "account/index.html", timezones=TIMEZONES, csrf=csrf_for(request)
+        request,
+        "account/index.html",
+        timezones=TIMEZONES,
+        csrf=csrf_for(request),
+        quota=snapshot(int(user.id)),
     )
 
 
@@ -201,8 +208,12 @@ def verify_email(request: Request, token: str = ""):
 
 
 @router.get("/account/llm")
-def llm_page(request: Request, next: str = "/interests/new"):
-    """用户配置自己的 LLM Key（BYOK）。系统已配置全局凭据时可直接跳过。"""
+def llm_page(request: Request, next: str = "/interests/new", welcome: int = 0):
+    """用户配置自己的 LLM Key（BYOK）。
+
+    `welcome=1` 是新用户注册后的引导态：即使站点已配全局凭据也展示，
+    并明确说明自带 Key 的好处（不占站点额度、不受次数限制）。
+    """
     guard = login_required(request)
     if guard:
         return guard
@@ -220,6 +231,7 @@ def llm_page(request: Request, next: str = "/interests/new"):
         global_ready=global_credentials().configured,
         next_url=next if next.startswith("/") else "/interests/new",
         presets=VENDOR_PRESETS,
+        welcome=bool(welcome),
     )
 
 
@@ -246,9 +258,18 @@ def llm_save(
     if action == "skip" and global_credentials().configured:
         return RedirectResponse(next, status_code=303)
 
-    base = base_url.strip().rstrip("/")
-    if not base or not api_key.strip():
-        _flash(request, "Base URL 与 API Key 均为必填", "error")
+    # 修复的漏洞：用户可提交任意 base_url，服务器会对其发起 POST ——
+    # 等于给每个注册用户一个非盲 SSRF + 内网端口扫描探针。
+    # 这里走与数据源同一套校验，且失败时不回显目标细节。
+    from app.core.urlguard import UnsafeURL, safe_base_url
+
+    try:
+        base = safe_base_url(base_url)
+    except UnsafeURL:
+        _flash(request, "Base URL 不被允许：仅支持公网 http/https 的 80 / 443 端口", "error")
+        return RedirectResponse("/account/llm", status_code=303)
+    if not api_key.strip():
+        _flash(request, "API Key 必填", "error")
         return RedirectResponse("/account/llm", status_code=303)
 
     with SessionLocal() as session:
@@ -263,7 +284,8 @@ def llm_save(
 
     ok, msg = test_connection(int(user.id))
     if not ok:
-        _flash(request, f"已保存，但连接测试失败：{msg}", "error")
+        # 不回显原始异常（含目标 URL、连接错误、HTTP 响应），只给结论
+        _flash(request, "已保存凭据，但连接测试失败，请检查 Key 与模型名是否正确", "error")
         return RedirectResponse("/account/llm", status_code=303)
     _flash(request, "API Key 配置成功并已通过连接测试", "ok")
     target = next if next.startswith("/") else "/interests/new"

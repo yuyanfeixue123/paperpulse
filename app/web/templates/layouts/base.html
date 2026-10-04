@@ -11,7 +11,9 @@
     <a class="brand" href="/">PaperPulse</a>
     <nav>
       {% if current_user %}
+        <a href="/">首页</a>
         <a href="/feed">今日推荐</a>
+        <a href="/stream">推荐流</a>
         <a href="/interests">我的订阅</a>
         <a href="/account">账户</a>
         {% if current_user.is_admin %}
@@ -26,6 +28,7 @@
     {% if current_user %}
       <span class="small muted">{{ current_user.email }}</span>
       <form method="post" action="/logout" style="margin:0">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
         <button class="btn secondary small" type="submit">退出</button>
       </form>
     {% endif %}

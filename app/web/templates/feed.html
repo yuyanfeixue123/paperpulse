@@ -4,10 +4,22 @@
 <div class="row" style="margin-bottom:16px">
   <h1 style="margin:0">今日推荐</h1>
   <span class="badge">{{ today }}</span>
-  {% if preview %}<span class="badge warn">实时预览</span>{% endif %}
+  {% if preview %}<span class="badge warn">含实时预览</span>{% endif %}
   <div class="spacer"></div>
+  <form method="post" action="/feed/recommend" style="margin:0">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn small" type="submit"
+            {% if not can_recommend %}disabled title="{{ recommend_reason }}"{% endif %}>
+      立刻推荐
+    </button>
+  </form>
+  <a class="btn secondary small" href="/stream">推荐流</a>
   <a class="btn secondary small" href="/">返回首页</a>
 </div>
+
+{% if not can_recommend %}
+<div class="notice">{{ recommend_reason }}</div>
+{% endif %}
 
 {% if not interests %}
   <div class="card">
@@ -16,33 +28,35 @@
   </div>
 {% else %}
 
-{% if interests|length > 1 %}
-<div class="row" style="margin-bottom:14px">
-  <span class="small muted">订阅：</span>
-  {% for i in interests %}
-    <a class="chip" href="/feed?interest_id={{ i.id }}"
-       style="{% if i.id == chosen.id %}background:var(--accent);color:#fff{% endif %}">{{ i.name }}</a>
-  {% endfor %}
-</div>
-{% else %}
-<p class="small muted" style="margin:0 0 12px">订阅：{{ chosen.name }}</p>
-{% endif %}
-
 <div class="notice">
-  这里展示<strong>全部</strong>推荐，按相关度从高到低排序。邮件只承载其中一部分 ——
+  按订阅依次展示今日推荐。邮件只承载其中一部分 ——
   邮件要受通道的内容政策与体积限制，站内列表不受影响。
-  {% if withheld > 0 %}
-  本期有 <strong>{{ withheld }}</strong> 篇因内容政策不会出现在邮件里，但在这里完整可见。
+  {% if withheld_total > 0 %}
+  今日有 <strong>{{ withheld_total }}</strong> 篇因内容政策不会出现在邮件里，但在这里完整可见。
   {% endif %}
+  <br>
+  <span class="small">
+    今日已用「立刻推荐」{{ runs_used }} / {{ runs_limit }} 次。
+    <a href="/interests">管理订阅</a> · <a href="/account">查看我的限额</a>
+  </span>
 </div>
 
-<p class="small muted">{{ source }} · 共 {{ items|length }} 篇</p>
+{% for g in groups %}
+<div class="section-head">
+  <h2 style="margin:0">{{ g.name }}</h2>
+  <span class="small muted">{{ g.today }} · 共 {{ g.rows|length }} 篇</span>
+  {% if g.preview %}<span class="badge warn">实时预览</span>{% endif %}
+  <div class="spacer"></div>
+  <a class="small" href="/interests/{{ g.id }}">管理该订阅</a>
+</div>
+{% if g.description %}<p class="small muted" style="margin:4px 0 10px">{{ g.description[:160] }}</p>{% endif %}
+<p class="small muted" style="margin:0 0 10px">{{ g.source }}</p>
 
-{% if not items %}
+{% if not g.rows %}
   <div class="card"><p class="muted">今天还没有可推荐的论文。可能是回看窗口内论文较少，或订阅刚创建。</p></div>
 {% endif %}
 
-{% for it in items %}
+{% for it in g.rows %}
 <div class="card">
   <div class="row" style="align-items:flex-start">
     <div style="flex:1">
@@ -71,7 +85,20 @@
   {% if it.reason %}
     <p style="margin:8px 0 0;color:#374251;font-size:13px">💡 {{ it.reason }}</p>
   {% endif %}
+  <div class="rate-row">
+    <span class="small muted">这条推荐准吗？</span>
+    <form method="post" action="/feed/rate" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="paper_id" value="{{ it.id }}">
+      <input type="hidden" name="interest_id" value="{{ g.id }}">
+      <button class="chip" name="rating" value="5" type="submit" title="很有用">👍 很有用</button>
+      <button class="chip" name="rating" value="3" type="submit" title="一般">一般</button>
+      <button class="chip" name="rating" value="1" type="submit" title="不感兴趣">👎 不感兴趣</button>
+    </form>
+    <span class="small muted">评价会回流到画像进化，效果与邮件内点击一致</span>
+  </div>
 </div>
+{% endfor %}
 {% endfor %}
 {% endif %}
 {% endblock %}

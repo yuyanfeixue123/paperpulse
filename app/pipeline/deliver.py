@@ -135,6 +135,24 @@ def send_delivery(delivery_id: int) -> bool:
         if digest is None:
             return False
         digest_id = int(digest.id)
+        digest_user_id = int(digest.user_id)
+
+    # 每用户邮件日配额。与通道级 daily_budget 并列：通道级管「服务商能发多少」，
+    # 用户级管「单个账号能占多少」—— 后者缺失时，一个批量注册的账号就能
+    # 吃掉整条通道的额度，其他人全部收不到（审计项：无每用户邮件额度）。
+    from app.core.quota import email_allowed
+
+    user_ok, user_reason = email_allowed(digest_user_id)
+    if not user_ok:
+        next_day = (now_utc() + timedelta(days=1)).date().isoformat()
+        with SessionLocal() as session:
+            d = session.get(Delivery, delivery_id)
+            d.status = "deferred"
+            d.deferred_to_date = next_day
+            d.last_error = user_reason
+            session.commit()
+        log.info("deliver.deferred_user_quota", user_id=digest_user_id)
+        return False
     # 渲染内容来自 digest_items（投递时重新渲染，避免把大 HTML 存库）
     from app.pipeline.digest import render_digest_payload
 
@@ -291,6 +309,31 @@ def send_verification_email(to_email: str, token: str) -> None:
 
     sysrow = _settings_row()
     subject, html, text = render_verification(sysrow.site_url, sysrow.site_name, token)
+    msg = OutgoingMessage(
+        to_email=to_email,
+        subject=subject,
+        html=html,
+        text=text,
+        from_email=json.loads(provider_row.config_json or "{}").get("from_email", ""),
+        from_name=get_settings().email.from_name,
+    )
+    provider = build_provider(provider_row.kind, _provider_config(provider_row))
+    provider.send(msg)
+
+
+def send_reset_password_email(
+    to_email: str, token: str, display_name: str = ""
+) -> None:
+    """发送重置密码邮件。异常向上抛，由调用方决定如何对用户呈现。"""
+    provider_row = primary_provider()
+    if provider_row is None:
+        raise RuntimeError("未配置邮件通道")
+    from app.pipeline.render import render_reset_password
+
+    sysrow = _settings_row()
+    subject, html, text = render_reset_password(
+        sysrow.site_url, sysrow.site_name, token
+    )
     msg = OutgoingMessage(
         to_email=to_email,
         subject=subject,

@@ -14,16 +14,11 @@ TMP_DB = (Path(__file__).resolve().parents[1] / "data" / "test_paperpulse.db").a
 @pytest.fixture(scope="session", autouse=True)
 def _env():
     os.environ["PAPERPULSE_NO_SCHEDULER"] = "1"
+    # 测试环境无真实密钥，显式声明为开发模式放行弱密钥回退
+    os.environ["PAPERPULSE_ENV"] = "development"
     os.environ["PAPERPULSE_SECRET_KEY"] = "test-secret"
     os.environ["PAPERPULSE_ENCRYPTION_KEY"] = base64.urlsafe_b64encode(b"0" * 32).decode()
     os.environ["PAPERPULSE_DB__URL"] = f"sqlite:///{TMP_DB}"
-
-    for p in (TMP_DB, TMP_DB + "-wal", TMP_DB + "-shm"):
-        if os.path.exists(p):
-            try:
-                os.remove(p)
-            except OSError:
-                pass
 
     import app.core.db as dbmod
     from app.core.config import reload_settings
@@ -32,18 +27,16 @@ def _env():
     reload_settings({"db": {"url": f"sqlite:///{TMP_DB}"}})
     dbmod._engine = None
     engine = dbmod.get_engine()
-    # 用 drop_all 而非删文件：Windows 下文件常被占用删不掉，
-    # 残留的旧表结构会导致「模型加了列但表里没有」的 500。
+    # 用 drop_all 清理表结构，**不删文件**：
+    #   1. Windows 下文件常被占用删不掉；
+    #   2. 残留的旧表结构会导致「模型加了列但表里没有」的 500，而 drop_all
+    #      同样能解决这一点；
+    #   3. 删文件会与部分沙箱/备份工具的删除保护冲突，让整个测试会话
+    #      在 fixture 阶段就 SystemExit。
     Base.metadata.drop_all(engine)
     dbmod.init_db()
     yield
     dbmod.SessionLocal.remove()
-    for p in (TMP_DB, TMP_DB + "-wal", TMP_DB + "-shm"):
-        if os.path.exists(p):
-            try:
-                os.remove(p)
-            except OSError:
-                pass
 
 
 @pytest.fixture()

@@ -55,6 +55,20 @@ def create_app() -> FastAPI:
 
     register_routes(app)
 
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        """全站兜底安全头。
+
+        放在这里而不是逐个模板，是为了让 **JSON / 静态 / 重定向** 响应
+        也带上（审计项：安全头只配在 Caddy，换反代或裸机访问即失效）。
+        render() 里也调了一次，靠 setdefault 保证幂等不覆盖。
+        """
+        from app.web.templates import apply_security_headers
+
+        response = await call_next(request)
+        apply_security_headers(response, request)
+        return response
+
     @app.get("/healthz", tags=["ops"])
     def healthz() -> JSONResponse:
         return JSONResponse({"status": "ok"})

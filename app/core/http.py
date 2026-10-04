@@ -43,12 +43,46 @@ def get_client() -> httpx.Client:
     if _client is None:
         with _client_lock:
             if _client is None:
+                # 不做自动重定向：改由 _guarded_get 逐跳校验后手动跟随
                 _client = httpx.Client(
                     timeout=DEFAULT_TIMEOUT,
-                    follow_redirects=True,
+                    follow_redirects=False,
                     headers={"User-Agent": user_agent()},
                 )
     return _client
+
+
+MAX_REDIRECTS = 3
+
+
+def _guarded_get(client, url, *, headers=None, timeout=None, **kwargs):
+    """GET 并逐跳校验重定向。
+
+    修复的漏洞：全局 follow_redirects=True 时，外网 URL 通过校验后
+    302 跳到 127.0.0.1 即可绕过 —— 校验只在入口做一次。
+    """
+    from app.core.urlguard import UnsafeURL, resolve_and_check
+
+    current = url
+    for _ in range(MAX_REDIRECTS + 1):
+        try:
+            resolve_and_check(current)
+        except UnsafeURL as exc:
+            raise httpx.InvalidURL(f"目标地址被安全策略拒绝：{exc}") from exc
+        resp = client.get(
+            current,
+            headers=headers,
+            timeout=timeout or DEFAULT_TIMEOUT,
+            follow_redirects=False,
+            **kwargs,
+        )
+        if resp.is_redirect and resp.headers.get("location"):
+            from urllib.parse import urljoin
+
+            current = urljoin(current, resp.headers["location"])
+            continue
+        return resp
+    raise httpx.TooManyRedirects("重定向次数过多")
 
 
 def configure_rate_limits(limits: Mapping[str, Mapping[str, Any]]) -> None:
@@ -162,12 +196,13 @@ def limited_post(
     timeout: float | None = None,
 ) -> httpx.Response:
     """LLM / 邮件 API 用的 POST，走 __default__ 桶（无间隔限制）。"""
-    client = get_client()
-    resp = client.post(
+    # LLM / 邮件 API 同样禁止自动重定向：否则校验过的外网地址可 302 到内网
+    resp = get_client().post(
         url,
         json=json_body,
         headers=headers,
         timeout=timeout or DEFAULT_TIMEOUT,
+        follow_redirects=False,
     )
     resp.raise_for_status()
     return resp

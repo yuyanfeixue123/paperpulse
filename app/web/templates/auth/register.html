@@ -12,8 +12,8 @@
       </div>
       <div class="field">
         <label>用户名（选填）</label>
-        <input type="text" name="username" autocomplete="username">
-        <p class="small muted">填写后可用「用户名或邮箱」登录；留空则只能用邮箱登录</p>
+        <input type="text" name="username" autocomplete="username" maxlength="64">
+        <p class="small muted">填写后可用「用户名或邮箱」登录；留空则只能用邮箱登录。仅限字母、数字与 _ - .</p>
       </div>
       <div class="field">
         <label>昵称（选填）</label>
@@ -21,12 +21,14 @@
       </div>
       <div class="field">
         <label>密码</label>
-        <input type="password" name="password" required>
-        <p class="small muted">至少 10 位，含大小写字母与数字</p>
+        <input type="password" name="password" id="reg-password" required autocomplete="new-password">
+        <p class="pw-rules" id="pw-rules"></p>
+        <p class="small muted">边输入边检查：至少 10 位，含大小写字母与数字</p>
       </div>
       <button type="submit">注册</button>
     </form>
     <p class="small muted" style="margin-top:14px">已有账号？<a href="/login">登录</a></p>
   </div>
 </div>
+<script src="{{ static('form-enhance.js') }}"></script>
 {% endblock %}

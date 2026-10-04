@@ -38,26 +38,41 @@ def global_credentials() -> Credentials:
     )
 
 
-def resolve_credentials(user_id: int | None = None) -> Credentials:
-    """全局配置 + 用户 BYOK 覆盖。用户自带 Key 优先。"""
-    creds = global_credentials()
-    if not user_id or creds.configured:
-        return creds
+def user_credentials(user_id: int) -> Credentials | None:
+    """取用户自带凭据；没有或不完整则返回 None。"""
     from app.core.security import decrypt_value
     from app.models.user import User
 
-    with SessionLocal() as session:
-        user = session.get(User, int(user_id))
-        if user is None or not user.llm_base_url or not user.llm_api_key_enc:
-            return creds
-        key = decrypt_value(user.llm_api_key_enc)
-        if not key:
-            return creds
-        creds.provider = user.llm_provider or creds.provider
-        creds.base_url = user.llm_base_url
-        creds.api_key = key
-        creds.model_score = user.llm_model or creds.model_score
-        return creds
+    try:
+        with SessionLocal() as session:
+            user = session.get(User, int(user_id))
+            if user is None or not user.llm_base_url or not user.llm_api_key_enc:
+                return None
+            key = decrypt_value(user.llm_api_key_enc)
+    except Exception:  # noqa: BLE001 解密失败不应拖垮调用方
+        return None
+    if not key:
+        return None
+    creds = global_credentials()
+    creds.provider = user.llm_provider or creds.provider
+    creds.base_url = user.llm_base_url
+    creds.api_key = key
+    creds.model_score = user.llm_model or creds.model_score
+    return creds
+
+
+def resolve_credentials(user_id: int | None = None) -> Credentials:
+    """解析实际使用的凭据：**用户自带 Key 优先**，没有才回落到全局。
+
+    修复的漏洞：原实现是 `if not user_id or creds.configured: return creds`
+    —— 只要全局配了，用户 BYOK 永远不生效。这既与文档承诺相反，
+    也让「留空回落全局」的实现无法生效。
+    """
+    if user_id:
+        own = user_credentials(int(user_id))
+        if own is not None:
+            return own
+    return global_credentials()
 
 
 def llm_ready(user_id: int | None = None) -> tuple[bool, str]:
@@ -126,6 +141,18 @@ def complete_json(
     creds = resolve_credentials(user_id)
     if settings.llm.provider == "keyword" or not creds.configured:
         raise LLMError("未配置 LLM 凭据")
+
+    # 每用户日配额闸门。放在这里而不是各调用点，是因为本函数是
+    # **唯一**的 LLM 出口 —— 一次拦截即覆盖打分 / 解析 / 修订 / 连接测试，
+    # 不会因为将来新增调用点而漏掉（审计项：无每用户 LLM 用量限制）。
+    # 只对有归属的用户计数；系统级调用（user_id=None）不受限。
+    if user_id:
+        from app.core.quota import llm_allowed
+
+        allowed, reason = llm_allowed(int(user_id))
+        if not allowed:
+            log.info("llm.quota_exceeded", user_id=user_id, kind=kind)
+            raise LLMError(reason)
 
     model = model or creds.model_for(kind)
     attempts = retries if retries is not None else settings.llm.max_retries

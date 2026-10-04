@@ -178,11 +178,12 @@ def get_credential(source_key: str) -> str:
 
 def add_custom_rss(name: str, url: str, field: str = "custom") -> tuple[bool, str]:
     """后台添加自定义 RSS（含 SSRF 校验）。"""
-    from app.sources.rss import is_safe_url
+    from app.core.urlguard import UnsafeURL, resolve_and_check
 
-    ok, reason = is_safe_url(url)
-    if not ok:
-        return False, reason
+    try:
+        resolve_and_check(url)
+    except UnsafeURL as exc:
+        return False, str(exc)
     key = "rss_" + hashlib.sha1(url.encode()).hexdigest()[:10]
     with SessionLocal() as session:
         if session.query(Source).filter(Source.key == key).first():

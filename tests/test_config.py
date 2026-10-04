@@ -77,7 +77,12 @@ def test_rate_limit_enforces_interval():
 
 def test_env_file_is_loaded(monkeypatch):
     """回归：systemd 用 EnvironmentFile 注入密钥，CLI 手动运行不会，
-    导致自检误报「密钥缺失」。config 模块导入时应把 .env 载入 os.environ。"""
+    导致自检误报「密钥缺失」。config 模块导入时应把 .env 载入 os.environ。
+
+    用项目内的专属目录而不是 pytest 的 tmp_path（系统临时目录在受限
+    环境下可能无访问权限），且**不删文件** —— 既避开批量删除保护，
+    写入的内容本身是固定值，下次运行会直接覆盖。
+    """
     import os
 
     from app.core import config
@@ -92,7 +97,6 @@ def test_env_file_is_loaded(monkeypatch):
         assert os.environ["PAPERPULSE_TEST_ENVFILE"] == "loaded"
     finally:
         monkeypatch.delenv("PAPERPULSE_TEST_ENVFILE", raising=False)
-        env_file.unlink(missing_ok=True)
 
 
 def test_env_file_does_not_override_existing(monkeypatch):
@@ -110,4 +114,3 @@ def test_env_file_does_not_override_existing(monkeypatch):
         assert os.environ["PAPERPULSE_TEST_ENVFILE2"] == "fromenv"
     finally:
         monkeypatch.delenv("PAPERPULSE_TEST_ENVFILE2", raising=False)
-        env_file.unlink(missing_ok=True)

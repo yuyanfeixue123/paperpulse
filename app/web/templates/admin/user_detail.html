@@ -44,6 +44,44 @@
   {% endif %}
 </div>
 
+{% if quota %}
+<div class="card">
+  <h2>每日额度</h2>
+  <p class="small muted">
+    留空 = 跟随系统默认。当前生效：邮件 <strong>{{ quota.effective_email }}</strong> 封/天、
+    立刻推荐 <strong>{{ quota.effective_reco }}</strong> 次/天。
+    {% if quota.has_own_key %}
+    该用户已配置自己的 API Key，<strong>不受「立刻推荐」次数限制</strong>（花的是他自己的 token）。
+    {% endif %}
+  </p>
+  <form method="post" action="/admin/users/{{ u.user_id }}/quota">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid2">
+      <div class="field">
+        <label>每日邮件额度（封）</label>
+        <input type="number" name="daily_email_quota" min="0" placeholder="跟随默认"
+               value="{{ quota.daily_email_quota if quota.daily_email_quota is not none else '' }}">
+        <p class="small muted">0 = 不限</p>
+      </div>
+      <div class="field">
+        <label>每日「立刻推荐」次数</label>
+        <input type="number" name="daily_recommend_quota" min="0" placeholder="跟随默认"
+               value="{{ quota.daily_recommend_quota if quota.daily_recommend_quota is not none else '' }}">
+        <p class="small muted">控 token 用量；0 = 不限</p>
+      </div>
+    </div>
+    <label class="small">
+      <input type="checkbox" name="email_quota_unlimited" value="1"
+             {% if quota.email_quota_unlimited %}checked{% endif %}>
+      不限邮件数量（可信用户 / 内部测试账号）
+    </label>
+    <div style="margin-top:12px">
+      <button type="submit">保存额度</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
 <div class="card">
   <h2>订阅（{{ interests|length }}）</h2>
   {% if interests %}
