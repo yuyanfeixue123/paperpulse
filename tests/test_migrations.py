@@ -29,17 +29,31 @@ _DB_SEQ = itertools.count(1)
 
 
 def test_all_migrations_upgrade_and_downgrade():
-    from sqlalchemy import create_engine, inspect
 
     # 不用 tmp_path：受限环境下系统临时目录可能无访问权限。
     # 库名带唯一后缀 —— 复用固定名字会踩到「上轮已 downgrade 到 base、
     # 但 alembic_version 表里还留着记录」的残留状态，导致 upgrade 跳过建表。
+    # 用完删掉：否则 data/ 会随每次运行积累一批探测库。
     db = (
         Path(__file__).resolve().parents[1]
         / "data"
         / f"_mig_probe_{os.getpid()}_{next(_DB_SEQ)}.db"
     )
     cfg = _cfg(db)
+    try:
+        _run_checks(cfg, db)
+    finally:
+        for suffix in ("", "-wal", "-shm"):
+            probe = Path(str(db) + suffix)
+            if probe.exists():
+                try:
+                    probe.unlink()
+                except OSError:
+                    pass  # Windows 上文件可能仍被占用，留着无害
+
+
+def _run_checks(cfg: Config, db: Path) -> None:
+    from sqlalchemy import create_engine, inspect
 
     command.upgrade(cfg, "head")
 
