@@ -22,6 +22,7 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[str] = mapped_column(Text, nullable=False)
+    last_login_at: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # BYOK（可选）：留空则回落全局凭据
     llm_provider: Mapped[str] = mapped_column(String, nullable=False, default="")

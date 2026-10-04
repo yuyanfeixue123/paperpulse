@@ -1,0 +1,112 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ u.display_name or u.email }} · 用户详情{% endblock %}
+{% block content %}
+<div class="row" style="margin-bottom:16px">
+  <h1 style="margin:0">{{ u.display_name or u.email }}</h1>
+  {% if u.is_admin %}<span class="badge">管理员</span>{% endif %}
+  {% if not u.is_active %}<span class="badge err">已停用</span>{% endif %}
+  {% if u.is_inactive %}<span class="badge warn">不活跃 {{ u.inactive_days }} 天</span>{% endif %}
+  <div class="spacer"></div>
+  <a class="btn secondary small" href="/admin/users">返回用户列表</a>
+</div>
+
+<div class="grid3">
+  <div class="card stat"><div class="v">{{ u.interests }}</div><div class="k">订阅（启用 {{ u.active_interests }}）</div></div>
+  <div class="card stat"><div class="v">{{ u.digests }}</div><div class="k">历史摘要</div></div>
+  <div class="card stat"><div class="v">{{ u.papers_received }}</div><div class="k">收到论文</div></div>
+  <div class="card stat"><div class="v">{{ u.feedbacks }}</div><div class="k">反馈次数</div></div>
+  <div class="card stat"><div class="v">{{ u.llm_calls }}</div><div class="k">LLM 调用</div></div>
+  <div class="card stat"><div class="v">{{ u.llm_tokens }}</div><div class="k">Token 消耗</div></div>
+</div>
+
+<div class="card">
+  <h2>账号</h2>
+  <table>
+    <tr><th style="width:140px">邮箱</th><td>{{ u.email }} {% if not u.email_verified %}<span class="badge warn">未验证</span>{% endif %}</td></tr>
+    <tr><th>用户名</th><td>{{ u.username or '（未设置）' }}</td></tr>
+    <tr><th>时区</th><td>{{ u.timezone }}</td></tr>
+    <tr><th>注册时间</th><td>{{ u.created_at }}</td></tr>
+    <tr><th>最后登录</th><td>{{ u.last_login_at or '从未登录' }}</td></tr>
+    <tr><th>最后活动</th>
+        <td>
+          {{ u.last_activity_at or '—' }}
+          {% if u.inactive_days is not none %}（{{ u.inactive_days }} 天前）{% endif %}
+        </td></tr>
+    <tr><th>LLM 凭据</th>
+        <td>{% if u.has_byok %}使用自带 Key（{{ u.llm_provider or 'openai_compatible' }} · {{ u.llm_model or '默认模型' }}）
+            {% else %}使用系统全局凭据{% endif %}</td></tr>
+    <tr><th>投递失败</th><td>{{ u.failed_deliveries }}</td></tr>
+  </table>
+  {% if u.notes %}
+  <div class="row" style="gap:6px;margin-top:12px">
+    {% for n in u.notes %}<span class="chip">{{ n }}</span>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>订阅（{{ interests|length }}）</h2>
+  {% if interests %}
+  <table>
+    <tr><th>名称</th><th>阈值</th><th>每日</th><th>新鲜度</th><th>推送</th><th>状态</th><th>版本</th><th>操作</th></tr>
+    {% for i in interests %}
+    <tr>
+      <td>{{ i.name }}</td>
+      <td>≥{{ i.min_score }}</td>
+      <td>{{ i.max_papers_per_day }} 篇</td>
+      <td>{{ i.lookback_days }} 天</td>
+      <td>{{ i.send_at }} {{ i.timezone }}</td>
+      <td>{% if i.is_active %}<span class="badge ok">启用</span>{% else %}<span class="badge warn">暂停</span>{% endif %}</td>
+      <td class="small muted">v{{ i.version }}</td>
+      <td><a class="small" href="/interests/{{ i.id }}">查看</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted small">该用户还没有订阅。</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>最近摘要</h2>
+  {% if recent %}
+  <table>
+    <tr><th>日期</th><th>订阅</th><th>篇数</th><th>状态</th></tr>
+    {% for d in recent %}
+    <tr>
+      <td>{{ d.date }}</td><td>{{ d.interest or '—' }}</td>
+      <td>{{ d.count }}</td>
+      <td><span class="badge {% if d.status == 'sent' %}ok{% else %}warn{% endif %}">{{ d.status }}</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted small">还没有生成过摘要。</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="color:var(--danger)">危险操作</h2>
+  {% if u.is_admin %}
+    <div class="notice">这是管理员账号，为避免把系统锁死，**不支持删除**。如需清理其数据，请先取消管理员身份。</div>
+  {% else %}
+    <p class="small">
+      删除该用户会<strong>不可恢复</strong>地清除其全部关联数据：
+      订阅与订阅修订、摘要与摘要条目、投递记录、推送历史、反馈、LLM 用量。
+      <strong>论文池本身不会被删除</strong>（论文是多用户共享的内容）。
+    </p>
+    <p class="small muted">
+      如果只是不想让这个人登录，用「停用」即可 —— 数据保留，随时可恢复。
+    </p>
+    <form method="post" action="/admin/users/{{ u.user_id }}/delete"
+          onsubmit="return confirm('最后确认：删除 {{ u.email }} 的全部数据？此操作不可恢复。')">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="row">
+        <input type="text" name="confirm" placeholder="输入「删除」以确认" style="width:200px">
+        <button class="btn danger" type="submit">永久删除该用户</button>
+        <a class="btn secondary" href="/admin/users">取消</a>
+      </div>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

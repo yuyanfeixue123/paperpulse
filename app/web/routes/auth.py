@@ -138,6 +138,13 @@ def login(request: Request, email: str = Form(""), password: str = Form(""), csr
 
     ready, _ = llm_ready(uid)
     target = "/interests" if ready else "/account/llm?next=/interests"
+    with SessionLocal() as session:
+        row = session.get(User, uid)
+        if row is not None:
+            row.last_login_at = utc_iso()
+            session.add(row)
+            session.commit()
+
     resp = RedirectResponse(target, status_code=303)
     set_session(resp, uid)
     return resp

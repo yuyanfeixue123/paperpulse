@@ -1,41 +1,75 @@
 {% extends "layouts/base.html" %}
-{% block title %}用户管理{% endblock %}
+{% block title %}用户管理 · PaperPulse{% endblock %}
 {% block content %}
-<h1>用户管理</h1>
-<div class="card">
-  <table>
-    <tr>
-      <th>ID</th><th>邮箱</th><th>状态</th><th>订阅</th><th>LLM 调用/tokens</th><th>最近投递失败原因</th><th>操作</th>
-    </tr>
-    {% for r in rows %}
-    <tr>
-      <td>{{ r.user.id }}</td>
-      <td>{{ r.user.email }}{% if r.user.is_admin %} <span class="badge">管理员</span>{% endif %}</td>
-      <td>
-        <span class="badge {% if r.user.is_active %}ok{% else %}warn{% endif %}">
-          {{ '启用' if r.user.is_active else '停用' }}
-        </span>
-        {% if not r.user.email_verified %}<span class="badge warn">未验证</span>{% endif %}
-      </td>
-      <td>
-        {% for it in r.interests %}
-          <span class="chip">{{ it.name }}</span>
-        {% else %}<span class="muted small">无</span>{% endfor %}
-      </td>
-      <td class="small">{{ r.calls }} / {{ r.tokens }}</td>
-      <td class="small muted">{{ r.last_error[:60] or '—' }}</td>
-      <td class="row" style="gap:6px">
-        <form method="post" action="/admin/users/{{ r.user.id }}/toggle">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <button class="btn secondary small" type="submit">{{ '停用' if r.user.is_active else '启用' }}</button>
-        </form>
-        <form method="post" action="/admin/users/{{ r.user.id }}/push">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <button class="btn small" type="submit">立即推送</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
+<div class="row" style="margin-bottom:16px">
+  <h1 style="margin:0">用户管理</h1>
+  <span class="badge">共 {{ total }}</span>
+  <span class="badge ok">活跃 {{ active_count }}</span>
+  <span class="badge warn">不活跃 {{ inactive_count }}</span>
+  <div class="spacer"></div>
+  <a class="btn secondary small" href="/admin">返回后台</a>
 </div>
+
+<div class="card">
+  <form method="get" action="/admin/users" class="row">
+    <input type="text" name="q" value="{{ query }}" placeholder="按邮箱 / 用户名 / 昵称搜索" style="width:280px">
+    <label class="small" style="margin:0">
+      <input type="checkbox" name="inactive" value="1" {% if show_inactive %}checked{% endif %}>
+      只看不活跃（超过 {{ active_days }} 天无活动）
+    </label>
+    <button class="btn small" type="submit">筛选</button>
+    {% if show_inactive or query %}
+      <a class="btn secondary small" href="/admin/users">重置</a>
+    {% endif %}
+  </form>
+  <p class="small muted" style="margin:10px 0 0">
+    「不活跃」= 最近一次登录或生成摘要距今 ≥ {{ active_days }} 天。
+    <b>停用</b>只是禁止登录，数据保留；<b>删除</b>会连同订阅、摘要、投递与反馈一并清除，不可恢复。
+  </p>
+</div>
+
+{% for r in rows %}
+<div class="card">
+  <div class="row" style="align-items:flex-start">
+    <div style="flex:1">
+      <div class="row" style="gap:8px">
+        <b>{{ r.display_name or r.email }}</b>
+        {% if r.username %}<span class="chip">{{ r.username }}</span>{% endif %}
+        {% if r.is_admin %}<span class="badge">管理员</span>{% endif %}
+        {% if r.is_inactive %}<span class="badge warn">不活跃 {{ r.inactive_days }} 天</span>{% endif %}
+        {% if not r.is_active %}<span class="badge err">已停用</span>{% endif %}
+        {% if not r.email_verified %}<span class="badge warn">邮箱未验证</span>{% endif %}
+      </div>
+      <div class="small muted" style="margin-top:4px">
+        {{ r.email }} · 注册于 {{ r.created_at[:10] }}
+        {%- if r.last_login_at %} · 最后登录 {{ r.last_login_at[:16] }}{% else %} · 从未登录{% endif %}
+      </div>
+      <div class="small" style="margin-top:6px;color:#374251">
+        订阅 <b>{{ r.interests }}</b>（启用 {{ r.active_interests }}）· 摘要 <b>{{ r.digests }}</b> ·
+        收到论文 <b>{{ r.papers_received }}</b> · 反馈 <b>{{ r.feedbacks }}</b> ·
+        LLM 调用 <b>{{ r.llm_calls }}</b>（{{ r.llm_tokens }} tokens）
+        {%- if r.failed_deliveries %} · <span style="color:var(--danger)">投递失败 {{ r.failed_deliveries }}</span>{% endif %}
+      </div>
+      {% if r.notes %}
+      <div class="row" style="gap:6px;margin-top:6px">
+        {% for n in r.notes %}<span class="chip">{{ n }}</span>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="row" style="gap:6px">
+      <a class="btn secondary small" href="/admin/users/{{ r.user_id }}">详情</a>
+      <form method="post" action="/admin/users/{{ r.user_id }}/toggle">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn secondary small" type="submit">{{ '停用' if r.is_active else '启用' }}</button>
+      </form>
+      <form method="post" action="/admin/users/{{ r.user_id }}/push">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn small" type="submit">立即推送</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card"><p class="muted">没有符合条件的用户。</p></div>
+{% endfor %}
 {% endblock %}
