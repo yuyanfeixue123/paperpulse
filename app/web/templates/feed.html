@@ -1,0 +1,77 @@
+{% extends "layouts/base.html" %}
+{% block title %}今日推荐 · PaperPulse{% endblock %}
+{% block content %}
+<div class="row" style="margin-bottom:16px">
+  <h1 style="margin:0">今日推荐</h1>
+  <span class="badge">{{ today }}</span>
+  {% if preview %}<span class="badge warn">实时预览</span>{% endif %}
+  <div class="spacer"></div>
+  <a class="btn secondary small" href="/">返回首页</a>
+</div>
+
+{% if not interests %}
+  <div class="card">
+    <p class="muted">你还没有订阅。创建订阅后，这里会每天展示按相关度排序的完整推荐。</p>
+    <a class="btn" href="/interests/new">新建订阅</a>
+  </div>
+{% else %}
+
+{% if interests|length > 1 %}
+<div class="row" style="margin-bottom:14px">
+  <span class="small muted">订阅：</span>
+  {% for i in interests %}
+    <a class="chip" href="/feed?interest_id={{ i.id }}"
+       style="{% if i.id == chosen.id %}background:var(--accent);color:#fff{% endif %}">{{ i.name }}</a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="small muted" style="margin:0 0 12px">订阅：{{ chosen.name }}</p>
+{% endif %}
+
+<div class="notice">
+  这里展示<strong>全部</strong>推荐，按相关度从高到低排序。邮件只承载其中一部分 ——
+  邮件要受通道的内容政策与体积限制，站内列表不受影响。
+  {% if withheld > 0 %}
+  本期有 <strong>{{ withheld }}</strong> 篇因内容政策不会出现在邮件里，但在这里完整可见。
+  {% endif %}
+</div>
+
+<p class="small muted">{{ source }} · 共 {{ items|length }} 篇</p>
+
+{% if not items %}
+  <div class="card"><p class="muted">今天还没有可推荐的论文。可能是回看窗口内论文较少，或订阅刚创建。</p></div>
+{% endif %}
+
+{% for it in items %}
+<div class="card">
+  <div class="row" style="align-items:flex-start">
+    <div style="flex:1">
+      <div style="font-weight:600;font-size:15px;margin-bottom:4px">
+        <a href="{{ it.doi and ('https://doi.org/' ~ it.doi) or it.url }}" target="_blank" rel="noopener">{{ it.title }}</a>
+      </div>
+      <div class="small muted">
+        {{ it.authors[:3] | join(', ') }}{% if it.authors|length > 3 %} 等{% endif %}
+        {% if it.venue %} · {{ it.venue }}{% endif %}
+        {% if it.published_at %} · {{ it.published_at }}{% endif %}
+      </div>
+      <div style="margin-top:6px">
+        <span class="stars">{{ it.stars }}</span>
+        <span class="small muted"> 相关度 {{ it.llm_score }}/5 · 综合 {{ it.final_score }}</span>
+        {% if not it.in_email %}<span class="badge warn" style="margin-left:6px">仅站内（不进邮件）</span>{% endif %}
+      </div>
+    </div>
+    <div style="text-align:right;white-space:nowrap">
+      {% if it.doi %}
+        <div class="small"><a href="https://doi.org/{{ it.doi }}" target="_blank" rel="noopener">DOI</a></div>
+        <div class="small muted" style="font-size:11px">{{ it.doi }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% if it.summary %}<p style="margin:10px 0 0;color:#4b5563">{{ it.summary }}</p>{% endif %}
+  {% if it.reason %}
+    <p style="margin:8px 0 0;color:#374251;font-size:13px">💡 {{ it.reason }}</p>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

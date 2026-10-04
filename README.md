@@ -173,6 +173,26 @@ Self-healing is built in: tasks stuck past their 600 s soft timeout are reset (a
 | [Email delivery](docs/email-delivery.md) | Free-tier comparison, quota governance, anti-spam checklist |
 | **Setup guides** | [Getting an LLM API key](docs/guides/llm-api-key.md) · [Configuring email delivery & DNS](docs/guides/email-delivery-setup.md) — step-by-step for deployers |
 
+## In-site "Today's Picks"
+
+Email is constrained by channel content policies and size; the web feed is not.
+Signed-in users see **all** recommendations at `/feed` (or the home page), sorted by
+relevance score, each with title, DOI, abstract excerpt and the LLM's reason, and
+scorable inline.
+
+If your mail channel rejects messages on content (common with CN providers), set
+`email.content_filter_patterns` in `config/config.yaml`:
+
+```yaml
+email:
+  content_filter_patterns:
+    - "transgender|gender dysphoria"
+```
+
+Matching papers stay out of the email body and appear in the web feed only; the
+email then states how many were withheld and links to the full list. See
+[Email delivery setup](docs/guides/email-delivery-setup.md).
+
 ## Known limitations
 
 - **Chinese input without an LLM.** The local tokenizer emits Chinese keywords while the pool holds English metadata, and FTS5's `unicode61` tokenizer cannot match across languages. Configure an LLM and bilingual keywords are produced, which removes the limitation.

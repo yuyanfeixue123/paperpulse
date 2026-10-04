@@ -11,6 +11,7 @@
     <a class="brand" href="/">PaperPulse</a>
     <nav>
       {% if current_user %}
+        <a href="/feed">今日推荐</a>
         <a href="/interests">我的订阅</a>
         <a href="/account">账户</a>
         {% if current_user.is_admin %}

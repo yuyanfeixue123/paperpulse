@@ -10,7 +10,7 @@ from app.web.templates import render
 router = APIRouter()
 
 
-@router.get("/")
-def home(request: Request):
-    user = current_user(request)
-    return render(request, "home.html", user=user)
+@router.get("/landing")
+def landing(request: Request):
+    """未登录时的落地页。登录用户访问 / 会由 feed 路由重定向到 /feed。"""
+    return render(request, "home.html", user=current_user(request))

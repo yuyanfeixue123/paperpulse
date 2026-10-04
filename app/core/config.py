@@ -98,6 +98,7 @@ class EmailConfig(BaseModel):
     daily_budget: int = 250
     max_per_minute: int = 20
     from_name: str = "PaperPulse"
+    content_filter_patterns: list[str] = []
 
 
 class RetentionConfig(BaseModel):

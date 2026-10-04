@@ -31,19 +31,29 @@ def render_digest(
     salutation: str = "",
     lookback_days: int = 0,
 ) -> tuple[str, str, str]:
-    """返回 (subject, html, text)。"""
+    """返回 (subject, html, text)。
+
+    items 为**全部**推荐条目；内部按内容过滤规则裁剪出可进邮件的部分，
+    其余转为「未通过邮件通道送达」的提示，引导用户登录站内查看完整列表。
+    """
+    from app.core.utils import truncate
+    from app.pipeline.curation import split_for_email
+
+    emailable, withheld = split_for_email(items)
+    shown = emailable or items  # 全被过滤时至少把列表给出去，不空发
+
     links = []
-    for it in items:
+    for it in shown:
         links.append(
             {
                 **it,
+                "summary": truncate(str(it.get("abstract") or ""), 220),
                 "stars": "★" * int(it.get("llm_score", 0)) + "☆" * (5 - int(it.get("llm_score", 0))),
                 "rate_url": {
                     r: feedback_url(site_url, user_id, int(it["id"]), interest_id, r)
                     for r in (1, 5)
                 },
                 "boring_url": feedback_url(site_url, user_id, int(it["id"]), interest_id, 1),
-                "doi_url": f"https://doi.org/{it['doi']}" if it.get("doi") else it.get("url", ""),
             }
         )
 
@@ -55,6 +65,9 @@ def render_digest(
         "salutation": salutation or "你好",
         "lookback_days": lookback_days,
         "items": links,
+        "withheld_count": len(withheld),
+        "total_count": len(items),
+        "feed_url": f"{site_url.rstrip('/')}/feed",
         "unsub_url": one_click_unsubscribe_url(site_url, user_id, interest_id),
         "keyword_mode": keyword_mode,
     }

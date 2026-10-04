@@ -42,6 +42,13 @@ email:
   daily_budget: 250             # Brevo 免费上限 300，留 50 缓冲
   max_per_minute: 20
   from_name: PaperPulse
+  # 内容过滤规则（正则，Python 语法，不区分大小写）。
+  # 命中的论文不进邮件正文，只在站内「今日推荐」呈现，并在邮件里提示
+  # 「另有 N 篇未通过邮件通道送达，登录查看完整推荐」。
+  # 用途：某些邮件服务商（如阿里云 DirectMail）会按内容审核拦截邮件，
+  # 导致整封被拒（554 Reject by content spam），把可用额度白白浪费掉。
+  # 留空表示不做过滤；按自己通道的政策与研究领域按需填写。
+  content_filter_patterns: []
 retention:
   days: 30
   batch_size: 1000

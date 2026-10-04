@@ -17,6 +17,7 @@ from app.web.routes import (
     admin_storage,
     admin_system,
     auth,
+    feed,
     feedback,
     public,
     setup,
@@ -31,6 +32,7 @@ EXEMPT_PREFIXES = ("/login", "/register", "/verify", "/logout", "/static", "/hea
 def register_routes(app: FastAPI) -> None:
     for module in (
         public,
+        feed,
         auth,
         account,
         subscribe,

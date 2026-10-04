@@ -11,14 +11,24 @@
 {% for it in items %}
 {{ loop.index }}. {{ it.title }}
    {{ it.authors[:3] | join(', ') }}{% if it.authors|length > 3 %} 等{% endif %}{% if it.venue %} · {{ it.venue }}{% endif %}{% if it.published_at %} · {{ it.published_at[:10] }}{% endif %}
-   相关度：{{ it.stars }}
-{% if it.reason %}   理由：{{ it.reason }}{% endif %}
-{% if it.doi %}   DOI: https://doi.org/{{ it.doi }}{% endif %}
-   链接: {{ it.url }}
+   相关度：{{ it.llm_score }}/5  {{ it.stars }}
+{% if it.summary %}   简述：{{ it.summary }}{% endif %}
+{% if it.reason %}   推荐理由：{{ it.reason }}{% endif %}
+{% if it.doi %}   DOI: {{ it.doi }}  https://doi.org/{{ it.doi }}{% else %}   链接: {{ it.url }}{% endif %}
    有用: {{ it.rate_url[5] }}
    不感兴趣: {{ it.boring_url }}
 
 {% endfor %}
+{% if withheld_count > 0 %}
+----------------------------------------------------------------
+另有 {{ withheld_count }} 篇未通过本邮件通道送达。
+
+本期共推荐 {{ total_count }} 篇，上方列出 {{ items|length }} 篇。其余 {{ withheld_count }} 篇
+因内容政策未进入邮件正文，但推荐结果已完整保留。
+
+登录查看完整推荐（{{ total_count }} 篇）：
+{{ feed_url }}
+{% endif %}
 --
 这封邮件由 {{ site_name }} 自动发送至你的订阅邮箱。
 

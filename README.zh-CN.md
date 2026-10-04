@@ -173,6 +173,26 @@ python -m app.cli run-once fetch|dispatch|digest|purge|revise [id]
 | [邮件投递](docs/email-delivery.md) | 免费额度对比、配额治理、反垃圾清单
 | **配置教程** | [获取 LLM API Key](docs/guides/llm-api-key.md) · [配置邮件通道与 DNS](docs/guides/email-delivery-setup.md) | |
 
+## 站内「今日推荐」
+
+邮件要受通道的内容政策与体积限制，站内列表不受。登录后访问 `/feed`
+（或直接点首页）即可看到**全部**推荐，按相关度从高到低排序，含标题、DOI、
+简述与推荐理由，可直接评分回��画像。
+
+若邮件通道按内容审核拒收（常见于国内通道），可在
+`config/config.yaml` 配置 `email.content_filter_patterns`：
+
+```yaml
+email:
+  content_filter_patterns:
+    - "transgender|gender dysphoria"
+    - "性少数|跨性别|性别认同"
+```
+
+命中的论文不进邮件正文、只在站内呈现，邮件里会告知
+「另有 N 篇未通过本邮件通道送达，登录查看完整推荐」并给出入口。
+详见 [邮件通道配置教程](docs/guides/email-delivery-setup.md#用内置过滤规则把高风险内容留在站内)。
+
 ## 已知限制
 
 - **未配 LLM 时的中文召回**：本地分词产出中文关键词，而论文池是英文元数据，FTS5 默认 `unicode61` 分词器无法跨语言匹配。配置 LLM 后会产出中英双语关键词，该限制即消失。
