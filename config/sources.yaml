@@ -208,13 +208,13 @@ sources:
     enabled: false
 
   - key: pubmed
-    name: PubMed
+    name: PubMed（NCBI E-utilities）
     type: pubmed
     field: medicine
     url_template: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi
-    params: { query: "" }
+    params: {}
     requires_key: true
-    rate_limit: { interval_seconds: 0.4, concurrency: 1 }
+    rate_limit: { interval_seconds: 0.12, concurrency: 2 }
     enabled: false
 
   - key: unpaywall

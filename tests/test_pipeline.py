@@ -175,3 +175,69 @@ def test_doaj_item_with_month_name():
     )
     assert item.title == "A DOAJ Article"
     assert item.published_at.startswith("2026-10-01")
+
+
+PUBMED_XML = """<?xml version="1.0"?>
+<PubmedArticleSet><PubmedArticle>
+  <MedlineCitation>
+    <PMID>39000000</PMID>
+    <Article PubModel="Print">
+      <Journal>
+        <JournalIssue><PubDate><Year>2024</Year><Month>06</Month><Day>23</Day></PubDate></JournalIssue>
+        <Title>Int J Mol Sci</Title>
+      </Journal>
+      <ArticleTitle>Combined Proteomic &amp; Metabolomic Analysis of a Vaccine</ArticleTitle>
+      <Abstract>
+        <AbstractText Label="BACKGROUND">Somatostatin plays crucial regulatory roles in animal growth and reproduction by affecting the synthesis and secretion of growth hormone in the hypothalamus and pituitary glands of treated animals across the whole experimental period of thirty days.</AbstractText>
+        <AbstractText Label="RESULTS">Expression of 58 proteins in the hypothalamus and 124 in the pituitary gland was significantly altered following vaccine treatment.</AbstractText>
+      </Abstract>
+      <AuthorList>
+        <Author><LastName>Qin</LastName><ForeName>Gang</ForeName></Author>
+        <Author><LastName>Zhang</LastName><ForeName>Lei</ForeName></Author>
+        <Author><CollectiveName>Consortium</CollectiveName></Author>
+      </AuthorList>
+      <ELocationID EIdType="doi" ValidYN="Y">10.3390/ijms25136888</ELocationID>
+    </Article>
+  </MedlineCitation>
+  <PubmedData>
+    <ArticleIdList>
+      <ArticleId IdType="pubmed">39000000</ArticleId>
+      <ArticleId IdType="pmc">PMC11241613</ArticleId>
+    </ArticleIdList>
+  </PubmedData>
+</PubmedArticle></PubmedArticleSet>"""
+
+
+def test_pubmed_medline_date():
+    from app.sources.pubmed import _parse_medline_date
+
+    assert _parse_medline_date("2024 Jun 23").startswith("2024-06-01")
+    assert _parse_medline_date("2024 Jun-Apr").startswith("2024-06-01")
+    assert _parse_medline_date("2024").startswith("2024-01-01")
+    # 无法识别的日期退化为「当前时间」而非 1970，避免被 lookback 窗口过滤掉
+    assert _parse_medline_date("").startswith("20")
+
+
+def test_pubmed_parses_real_xml_shape():
+    from app.sources.pubmed import PubmedSource
+
+    src = PubmedSource({"key": "pubmed"})
+    items = list(src._parse(PUBMED_XML))
+    assert len(items) == 1
+    it = items[0]
+    assert it.source_id == "39000000"
+    assert it.title == "Combined Proteomic & Metabolomic Analysis of a Vaccine"
+    assert it.doi == "10.3390/ijms25136888"
+    assert it.venue == "Int J Mol Sci"
+    assert it.authors == ["Gang Qin", "Lei Zhang"]
+    assert "Somatostatin plays crucial regulatory roles" in it.abstract
+    assert "58 proteins" in it.abstract
+    assert it.published_at.startswith("2024-06-23")
+    assert it.abstract_quality == "full"
+
+
+def test_pubmed_tolerates_broken_xml():
+    from app.sources.pubmed import PubmedSource
+
+    assert list(PubmedSource({"key": "pubmed"})._parse("<not-xml")) == []
+    assert list(PubmedSource({"key": "pubmed"})._parse("<a/>")) == []

@@ -21,6 +21,7 @@ from app.sources.europepmc import EuropePmcSource
 from app.sources.generic import ChemrxivSource, HalSource, ZenodoSource
 from app.sources.openalex import OpenAlexSource
 from app.sources.osf import OsfSource
+from app.sources.pubmed import PubmedSource
 from app.sources.rss import RssSource
 
 log = get_logger(__name__)
@@ -36,6 +37,7 @@ ADAPTERS: dict[str, type[SourceBase]] = {
     "zenodo": ZenodoSource,
     "hal": HalSource,
     "chemrxiv": ChemrxivSource,
+    "pubmed": PubmedSource,
 }
 
 
