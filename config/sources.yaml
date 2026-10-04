@@ -464,6 +464,273 @@ sources:
     rate_limit: { interval_seconds: 1, concurrency: 2 }
     enabled: false
 
+  # ---------- Nature 家族（{slug}.rss，与已收录的 nature.rss 同源同格式）----------
+  # 核实日期：2026-10-04，26 个 feed 全部 HTTP 200 且 feedparser 可解析
+  - key: nature_mi
+    name: Nature Machine Intelligence
+    type: rss
+    field: cs
+    url_template: https://www.nature.com/natmachintell.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: nature_humbehav
+    name: Nature Human Behaviour
+    type: rss
+    field: social_sciences
+    url_template: https://www.nature.com/nathumbehav.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: nature_cities
+    name: Nature Cities
+    type: rss
+    field: urban
+    url_template: https://www.nature.com/natcities.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: npj_urban_sustain
+    name: npj Urban Sustainability
+    type: rss
+    field: urban
+    url_template: https://www.nature.com/npjurbansustain.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: nature_medicine
+    name: Nature Medicine
+    type: rss
+    field: medicine
+    url_template: https://www.nature.com/nm.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: nature_climate_change
+    name: Nature Climate Change
+    type: rss
+    field: earth_science
+    url_template: https://www.nature.com/nclimate.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: nature_energy
+    name: Nature Energy
+    type: rss
+    field: engineering
+    url_template: https://www.nature.com/nenergy.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: nature_chemistry
+    name: Nature Chemistry
+    type: rss
+    field: chemistry
+    url_template: https://www.nature.com/nchem.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: nature_genetics
+    name: Nature Genetics
+    type: rss
+    field: life_sciences
+    url_template: https://www.nature.com/ng.rss
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  # ---------- Elsevier（按 ISSN 无连字符拼接）----------
+  # 通用规律：https://rss.sciencedirect.com/publication/science/{ISSN}
+  # 意味着任何 Elsevier 刊都能零代码加进来，只要查到 ISSN
+  - key: elsevier_cities
+    name: Cities（Elsevier）
+    type: rss
+    field: urban
+    url_template: https://rss.sciencedirect.com/publication/science/02642751
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1.5, concurrency: 2 }
+    enabled: true
+
+  - key: elsevier_lup
+    name: Landscape and Urban Planning（Elsevier）
+    type: rss
+    field: urban
+    url_template: https://rss.sciencedirect.com/publication/science/01692046
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1.5, concurrency: 2 }
+    enabled: true
+
+  - key: elsevier_ceus
+    name: Computers, Environment and Urban Systems（Elsevier）
+    type: rss
+    field: urban
+    url_template: https://rss.sciencedirect.com/publication/science/01989715
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1.5, concurrency: 2 }
+    enabled: true
+
+  - key: elsevier_lup_policy
+    name: Land Use Policy（Elsevier）
+    type: rss
+    field: urban
+    url_template: https://rss.sciencedirect.com/publication/science/02648377
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1.5, concurrency: 2 }
+    enabled: true
+
+  - key: elsevier_scs
+    name: Sustainable Cities and Society（Elsevier）
+    type: rss
+    field: urban
+    url_template: https://rss.sciencedirect.com/publication/science/22106707
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1.5, concurrency: 2 }
+    enabled: true
+
+  - key: elsevier_jtg
+    name: Journal of Transport Geography（Elsevier）
+    type: rss
+    field: urban
+    url_template: https://rss.sciencedirect.com/publication/science/09666923
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1.5, concurrency: 2 }
+    enabled: true
+
+  - key: elsevier_trc
+    name: Transportation Research Part C（Elsevier）
+    type: rss
+    field: urban
+    url_template: https://rss.sciencedirect.com/publication/science/0968090X
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1.5, concurrency: 2 }
+    enabled: true
+
+  - key: elsevier_aic
+    name: Automation in Construction（Elsevier）
+    type: rss
+    field: engineering
+    url_template: https://rss.sciencedirect.com/publication/science/09265805
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1.5, concurrency: 2 }
+    enabled: true
+
+  # ---------- 医学 / 健康 ----------
+  - key: lancet_digital_health
+    name: The Lancet Digital Health
+    type: rss
+    field: medicine
+    url_template: https://www.thelancet.com/rssfeed/landig_current.xml
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: lancet_planetary_health
+    name: The Lancet Planetary Health
+    type: rss
+    field: medicine
+    url_template: https://www.thelancet.com/rssfeed/lanplh_current.xml
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: plos_medicine
+    name: PLOS Medicine
+    type: rss
+    field: medicine
+    url_template: https://journals.plos.org/plosmedicine/feed/atom
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: plos_biology
+    name: PLOS Biology
+    type: rss
+    field: life_sciences
+    url_template: https://journals.plos.org/plosbiology/feed/atom
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: annals_im
+    name: Annals of Internal Medicine
+    type: rss
+    field: medicine
+    url_template: https://www.acpjournals.org/action/showFeed?type=etoc&feed=rss&jc=aim
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  # ---------- CS / 经济 / 地球科学 ----------
+  - key: acm_csur
+    name: ACM Computing Surveys
+    type: rss
+    field: cs
+    url_template: https://dl.acm.org/action/showFeed?type=etoc&feed=rss&jc=csur
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: springer_ml
+    name: Machine Learning（Springer）
+    type: rss
+    field: cs
+    url_template: https://link.springer.com/search.rss?facet-journal-id=10994
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: econometrica
+    name: Econometrica（Wiley）
+    type: rss
+    field: economics
+    url_template: https://onlinelibrary.wiley.com/feed/14680262/most-recent
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
+  - key: grl_agu
+    name: Geophysical Research Letters（AGU）
+    type: rss
+    field: earth_science
+    url_template: https://agupubs.onlinelibrary.wiley.com/feed/19448007/most-recent
+    params: {}
+    requires_key: false
+    rate_limit: { interval_seconds: 1, concurrency: 2 }
+    enabled: true
+
   - key: sage_epb
     name: SAGE · Environment and Planning B
     type: rss

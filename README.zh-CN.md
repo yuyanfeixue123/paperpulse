@@ -106,7 +106,7 @@ docker compose up -d
 
 ## 内置数据源
 
-源链接核实日期：**2026-10-03**。🟢 已核实 · 🟡 按官方模板推导，部署时须现场验证 · ⚪ 待验证。
+源链接核实日期：**2026-10-04**。🟢 已核实 · 🟡 按官方模板推导，部署时须现场验证 · ⚪ 待验证。
 
 | 类别 | 源 |
 |---|---|
@@ -114,10 +114,13 @@ docker compose up -d
 | **社区热度** | HuggingFace Daily Papers ⚪ 默认关闭 —— 只覆盖 AI 垂类。开启后额外提供**代码仓库**（作者自填的 `githubRepo`，准确率远高于按标题盲搜）与社区关键词（补关键词模式短板）|
 | **专业 API** | bioRxiv 🟢 · medRxiv 🟢 · ChemRxiv 🟡 · Zenodo 🟡 · HAL 🟡 |
 | **需 Key** | Semantic Scholar 🟡 · PubMed 🟡 —— 默认关闭，未填凭据前开关置灰 |
-| **RSS / Atom** | Nature ×3 · Science ×2 · PNAS · eLife · PLOS ONE · NBER 🟢 · Cell · Lancet · JAMA · BMJ · NEJM · bioRxiv/medRxiv · Wiley · T&F · SAGE · Springer 🟡 |
+| **RSS / Atom** | Nature ×12 🟢（含 Nature Cities、npj Urban Sustainability、Nature Human Behaviour 等）· Science ×2 · PNAS · eLife · PLOS ONE ×2 · NBER · Cell · Lancet ×3 · JAMA · BMJ · NEJM · **Elsevier ×8** 🟢（Cities、Landscape and Urban Planning、CEUS、Land Use Policy、SCS、Journal of Transport Geography、TR-C、Automation in Construction）· **ACM Computing Surveys** 🟢 · **Machine Learning**（Springer）🟢 · **Econometrica** 🟢 · **GRL**（AGU）🟢 · **Annals of Internal Medicine** 🟢 · bioRxiv/medRxiv · Wiley · T&F · SAGE · Springer 🟡 |
 | **自定义** | 后台可添加任意 RSS/Atom 地址，带 SSRF 校验与 feed 自动发现 |
 
 默认只开启免注册源。新增源**不需要改代码** —— 一段 YAML + 选一个已有适配器即可。
+
+**Elsevier 的通用规律**：`https://rss.sciencedirect.com/publication/science/{ISSN}`
+（ISSN 无连字符）。任何 Elsevier 刊只要查到 ISSN 就能零代码接入。
 
 > ⚠️ arXiv 官方分类 RSS 页已下线（`info.arxiv.org/help/rss` → 404），请用 API 查询串当 feed，遵守 ≤1 请求 / 3 秒。
 > ⚠️ JournalTOCs 已于 2026-09-06 停止解析，Zetoc 于 2022 退役。本项目不依赖任何第三方 TOC 聚合器。
