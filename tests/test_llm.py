@@ -192,3 +192,33 @@ def test_revise_patch_normalizes_bilingual(db):
         exc = json.loads(row.exclude_keywords_json)
     assert "街景" in inc and "street view" in inc
     assert not any(" / " in k for k in inc + exc)
+
+
+def test_extract_results_normalizes_shapes():
+    """回归：端点只支持 json_object 时 schema 不生效，模型会按 prompt 返回
+    裸对象或裸数组。不归一化会静默丢分，摘要退化成 BM25 顺序。"""
+    from app.pipeline.score import extract_results
+
+    # 标准形态
+    assert extract_results({"results": [{"id": "1", "score": 5}]}) == [
+        {"id": "1", "score": 5}
+    ]
+    # DeepSeek 实际返回的裸对象（单篇）
+    assert extract_results({"id": "1", "score": 3, "reason": "x"}) == [
+        {"id": "1", "score": 3, "reason": "x"}
+    ]
+    # 裸数组（多篇）
+    assert extract_results([{"id": "1", "score": 4}, {"id": "2", "score": 2}]) == [
+        {"id": "1", "score": 4},
+        {"id": "2", "score": 2},
+    ]
+    # 其他可能的容器键
+    assert extract_results({"papers": [{"id": "9", "score": 1}]}) == [
+        {"id": "9", "score": 1}
+    ]
+    # 无法识别
+    assert extract_results({"error": "rate limited"}) == []
+    assert extract_results("not a dict") == []
+    assert extract_results(None) == []
+    # 过滤非 dict 元素
+    assert extract_results([{"id": "1"}, "junk", None]) == [{"id": "1"}]

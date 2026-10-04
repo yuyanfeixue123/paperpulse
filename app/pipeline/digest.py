@@ -209,8 +209,13 @@ def render_digest_payload(digest_id: int) -> dict[str, Any] | None:
         salutation=salutation,
         lookback_days=lookback,
     )
+    from app.core.security import make_token
+
+    unsub_token = make_token(uid=int(d.user_id), interest_id=int(d.interest_id), act="unsub")
+    unsub_url = f"{site_url.rstrip('/')}/u/{unsub_token}"
     headers = {
-        "List-Unsubscribe": f"<{site_url.rstrip('/')}/u/unsubscribe>, <https://{site_url}>",
+        # RFC 8058：一键退订必须用可 GET 的 https 地址，且与正文链接同域
+        "List-Unsubscribe": f"<{unsub_url}>",
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         "X-PaperPulse-Digest": str(digest_id),
     }

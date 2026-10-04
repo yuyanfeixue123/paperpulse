@@ -72,6 +72,25 @@ def cached_scores(paper_ids: list[int], interest: Interest) -> dict[int, dict]:
     }
 
 
+def extract_results(data: object) -> list[dict]:
+    """把 LLM 返回归一成结果列表。
+
+    json_schema 模式下严格是 {"results": [...]}，但端点只支持 json_object 时
+    （DeepSeek、通义兼容模式等）schema 不生效，模型常按 prompt 直接返回
+    裸数组 [{...}] 或单个对象 {...}。不做归一会静默丢分，退化成 BM25 顺序。
+    """
+    if isinstance(data, list):
+        return [x for x in data if isinstance(x, dict)]
+    if isinstance(data, dict):
+        for key in ("results", "papers", "items", "scores", "data"):
+            value = data.get(key)
+            if isinstance(value, list):
+                return [x for x in value if isinstance(x, dict)]
+        if "id" in data or "score" in data:
+            return [data]
+    return []
+
+
 def _save_scores(interest: Interest, results: list[dict], model: str) -> None:
     now = utc_iso()
     with SessionLocal() as session:
@@ -122,8 +141,10 @@ def score_papers(interest: Interest, papers: list[dict]) -> dict[int, dict]:
 
     from app.llm.client import complete_json
 
+    n_batches = 0
     for i in range(0, len(todo), batch_size):
         batch = todo[i : i + batch_size]
+        n_batches += 1
         items = [
             {
                 "id": str(p["id"]),
@@ -153,7 +174,10 @@ def score_papers(interest: Interest, papers: list[dict]) -> dict[int, dict]:
         except Exception as exc:  # noqa: BLE001
             log.error("score.batch_failed", interest=interest.id, error=str(exc)[:200])
             raise
-        _save_scores(interest, data.get("results", []), model)
+        results = extract_results(data)
+        if not results:
+            log.warning("score.empty_batch", interest=interest.id, batch=n_batches)
+        _save_scores(interest, results, model)
         cached.update(cached_scores([int(p["id"]) for p in batch], interest))
 
     return cached
