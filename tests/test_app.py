@@ -387,6 +387,64 @@ def test_welcome_email_handles_empty_lists(db):
     assert "空关键词" in text
 
 
+def test_welcome_render_and_send_signatures_agree(db, monkeypatch):
+    """回归：deliver.send_welcome_email 组装的 payload 含 to_email，
+    而 render_welcome 不接受该参数 —— 直接单测 render_welcome 抓不到，
+    只有走完整调用链才会暴露。"""
+    import inspect
+
+    from app.core.utils import utc_iso
+    from app.models.interest import Interest
+    from app.models.user import User
+    from app.pipeline import deliver, render
+
+    render_params = set(inspect.signature(render.render_welcome).parameters)
+    src = inspect.getsource(deliver.send_welcome_email)
+    assert '"to_email": user.email' in src
+    # 传给 render_welcome 的键必须都是 render_welcome 接受的（除 to_email）
+    filtered = {"site_url", "site_name", "interest_name", "description",
+                "include_keywords", "exclude_keywords", "send_at", "timezone",
+                "lookback_days", "max_papers_per_day", "min_score",
+                "first_digest_at", "user_id", "interest_id"}
+    assert filtered <= render_params, f"缺少参数: {filtered - render_params}"
+
+    with db() as s:
+        u = s.query(User).filter(User.email == "welcome-t@example.com").first()
+        if u is None:
+            u = User(email="welcome-t@example.com", password_hash="x", created_at=utc_iso())
+            s.add(u)
+            s.flush()  # 先拿到 user_id
+        it = s.query(Interest).filter(Interest.user_id == u.id).first()
+        if it is None:
+            it = Interest(user_id=u.id, name="N", description="d",
+                          include_keywords_json="[]", exclude_keywords_json="[]",
+                          source_keys_json="[]", arxiv_categories_json="[]",
+                          queries_json="{}", created_at=utc_iso())
+            s.add(it)
+        s.commit()
+        iid = int(it.id)
+
+    captured = {}
+
+    class FakeProvider:
+        def send(self, msg):
+            captured["to"] = msg.to_email
+            captured["subject"] = msg.subject
+            captured["html"] = msg.html
+            return "mid-1"
+
+    monkeypatch.setattr(deliver, "primary_provider", lambda: type(
+        "P", (), {"kind": "smtp", "config_json": json.dumps({"from_email": "a@b.c"})})())
+    monkeypatch.setattr(deliver, "build_provider", lambda kind, cfg: FakeProvider())
+    monkeypatch.setattr(deliver, "_provider_config", lambda row: {})
+
+    ok, msg = deliver.send_welcome_email(iid)
+    assert ok is True, msg
+    assert captured["to"] == "welcome-t@example.com"
+    assert "N" in captured["subject"]
+    assert "/verify-email?token=" in captured["html"]
+
+
 def test_send_welcome_requires_existing_interest(db):
     from app.pipeline.deliver import send_welcome_email
 

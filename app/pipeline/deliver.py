@@ -322,7 +322,7 @@ def send_welcome_email(interest_id: int) -> tuple[bool, str]:
     if provider_row is None:
         return False, "未配置邮件通道"
 
-    subject, html, text = render_welcome(**payload)
+    subject, html, text = render_welcome(**{k: v for k, v in payload.items() if k != "to_email"})
     msg = OutgoingMessage(
         to_email=payload["to_email"],
         subject=subject,

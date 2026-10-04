@@ -166,7 +166,7 @@ def test_revise_patch_normalizes_bilingual(db):
     with db() as s:
         s.add(
             Interest(
-                user_id=1, name="t", description="d",
+                user_id=1, name="唯一测试订阅-mlp", description="d",
                 include_keywords_json=dumps(["旧词"]), exclude_keywords_json="[]",
                 source_keys_json="[]", arxiv_categories_json="[]", queries_json="{}",
                 min_score=4, max_papers_per_day=5, lookback_days=7, send_at="08:30",
@@ -175,7 +175,9 @@ def test_revise_patch_normalizes_bilingual(db):
             )
         )
         s.commit()
-        iid = int(s.query(Interest).one().id)
+        row = s.query(Interest).filter(Interest.name == "唯一测试订阅-mlp").first()
+        assert row is not None
+        iid = int(row.id)
 
     apply_patch(
         iid,
