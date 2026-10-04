@@ -37,6 +37,7 @@
                           │                    （每次 20 篇）
                           ▼
   final = 0.7·LLM + 0.2·口味相似度 + 0.1·新鲜度 − 0.5·已推过
+          （同分时再比引文数 —— 不并入上式，否则会系统性压制新论文）
                           │
                           ▼
               每日邮件 ──★1–5 / 不感兴趣──▶ 画像进化
@@ -110,6 +111,7 @@ docker compose up -d
 | 类别 | 源 |
 |---|---|
 | **综合 API** | arXiv（9 个学科源）🟢 · OpenAlex 🟢 · Crossref 🟢 · DOAJ 🟢 · Europe PMC 🟢 · OSF Preprints（5 个 provider）🟢 |
+| **社区热度** | HuggingFace Daily Papers ⚪ 默认关闭 —— 只覆盖 AI 垂类。开启后额外提供**代码仓库**（作者自填的 `githubRepo`，准确率远高于按标题盲搜）与社区关键词（补关键词模式短板）|
 | **专业 API** | bioRxiv 🟢 · medRxiv 🟢 · ChemRxiv 🟡 · Zenodo 🟡 · HAL 🟡 |
 | **需 Key** | Semantic Scholar 🟡 · PubMed 🟡 —— 默认关闭，未填凭据前开关置灰 |
 | **RSS / Atom** | Nature ×3 · Science ×2 · PNAS · eLife · PLOS ONE · NBER 🟢 · Cell · Lancet · JAMA · BMJ · NEJM · bioRxiv/medRxiv · Wiley · T&F · SAGE · Springer 🟡 |

@@ -31,7 +31,7 @@
 {% endif %}
 
 {% for it in items %}
-<div class="card">
+<div class="card" data-paper-card data-paper='{{ it|b64paper }}'>
   <div class="row" style="align-items:flex-start">
     <div style="flex:1">
       <div style="font-weight:600;font-size:15px;margin-bottom:4px">
@@ -64,6 +64,17 @@
     </div>
   </div>
   {% if it.summary %}<p style="margin:10px 0 0;color:#4b5563">{{ it.summary }}</p>{% endif %}
+  <div class="card-actions">
+    <span data-links hidden></span>
+    <span data-code hidden></span>
+    <a class="btn secondary tiny" href="#" data-copy-bibtex>BibTeX</a>
+    {% if it.cited_by > 0 %}
+      <span class="paper-meta">被引 {{ it.cited_by }} 次</span>
+    {% endif %}
+    {% if it.upvotes > 0 %}
+      <span class="paper-meta">社区 +{{ it.upvotes }}</span>
+    {% endif %}
+  </div>
   {# 评分是画像进化的核心闭环，登录后首页就是这一页，不能只有 /feed 能做 #}
   <div class="rate-row">
     <span class="small muted">这条推荐准吗？</span>
@@ -91,4 +102,5 @@
 {% endif %}
 {% endif %}
 <script src="{{ static('recommend-poll.js') }}"></script>
+<script src="{{ static('paper-links.js') }}"></script>
 {% endblock %}

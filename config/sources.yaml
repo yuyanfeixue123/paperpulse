@@ -106,6 +106,21 @@ sources:
     rate_limit: { interval_seconds: 0.5, concurrency: 2 }
     enabled: true
 
+  - key: hf_papers
+    name: HuggingFace Daily Papers（社区高赞）
+    type: hf_papers
+    field: ai
+    # 注意端点是 /api/daily_papers —— /api/papers/daily 不存在
+    url_template: https://huggingface.co/api/daily_papers
+    params: { page_size: 50 }
+    requires_key: false
+    rate_limit: { interval_seconds: 1.0, concurrency: 1 }
+    # 默认关闭：只覆盖 AI 垂类、以 arXiv 预印本为主，按需启用。
+    # 开启后可为 AI 用户补充两个别处拿不到的信号：
+    #   githubRepo —— 作者自填的代码仓库（准确率远高于按标题盲搜）
+    #   ai_keywords —— 社区侧关键词，补上关键词模式无 LLM 时的短板
+    enabled: false
+
   - key: doaj
     name: DOAJ 开放获取期刊
     type: doaj

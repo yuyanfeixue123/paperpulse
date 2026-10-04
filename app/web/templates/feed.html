@@ -63,7 +63,7 @@
 {% endif %}
 
 {% for it in g.rows %}
-<div class="card">
+<div class="card" data-paper-card data-paper='{{ it|b64paper }}'>
   <div class="row" style="align-items:flex-start">
     <div style="flex:1">
       <div style="font-weight:600;font-size:15px;margin-bottom:4px">
@@ -91,6 +91,14 @@
   {% if it.reason %}
     <p style="margin:8px 0 0;color:#374251;font-size:13px">💡 {{ it.reason }}</p>
   {% endif %}
+  <div class="card-actions">
+    <span data-links hidden></span>
+    <span data-code hidden></span>
+    <a class="btn secondary tiny" href="#" data-copy-bibtex>BibTeX</a>
+    {% if it.cited_by > 0 %}
+      <span class="paper-meta">被引 {{ it.cited_by }} 次</span>
+    {% endif %}
+  </div>
   <div class="rate-row">
     <span class="small muted">这条推荐准吗？</span>
     <form method="post" action="/feed/rate" style="margin:0">
@@ -109,4 +117,5 @@
 {% endif %}
 <script src="{{ static('form-enhance.js') }}"></script>
 <script src="{{ static('recommend-poll.js') }}"></script>
+<script src="{{ static('paper-links.js') }}"></script>
 {% endblock %}

@@ -64,11 +64,30 @@ def rank_papers(
                 "taste_sim": round(sim, 4),
                 "freshness": round(fresh, 4),
                 "final_score": round(final, 4),
+                # 引文数不并入上式，只在排序时当 tie-breaker 用。
+                # 理由：裸引文数有强时间偏置 —— 三天前的新论文必然是 0，
+                # 把它加进主公式会系统性压制新作，而 freshness 项的
+                # 半衰期只有 14 天，压不住这个偏置。
+                "cited_by": _cited_by(p),
             }
         )
 
-    out.sort(key=lambda x: x["final_score"], reverse=True)
+    # 排序：先按综合分，**同分时**才看引文数。
+    # 这样「AI 认为同样相关」的情况下优先推更有影响力的，
+    # 但不会让老论文因为引文多而整体排在新论文前面。
+    out.sort(
+        key=lambda x: (x["final_score"], _cited_by(x)),
+        reverse=True,
+    )
     return out[: interest.max_papers_per_day]
+
+
+def _cited_by(p: dict) -> int:
+    """取引文数，未知（-1 / 缺失）按 0 处理。"""
+    try:
+        return max(0, int(p.get("cited_by_count", -1)))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _sent_ids(user_id: int, ids: list[int]) -> set[int]:

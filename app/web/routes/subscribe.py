@@ -73,7 +73,26 @@ def list_interests(request: Request):
             .order_by(Interest.id.desc())
             .all()
         )
-    return render(request, "subscribe/list.html", interests=rows, csrf=csrf_for(request))
+    return render(
+        request,
+        "subscribe/list.html",
+        interests=[
+            {
+                "id": int(r.id),
+                "name": r.name,
+                "description": r.description,
+                "is_active": r.is_active,
+                "min_score": r.min_score,
+                "max_papers_per_day": r.max_papers_per_day,
+                "send_at": r.send_at,
+                "timezone": r.timezone,
+                "version": r.version,
+                "cadence_label": _cadence_label(r),
+            }
+            for r in rows
+        ],
+        csrf=csrf_for(request),
+    )
 
 
 @router.get("/interests/new")
@@ -133,6 +152,8 @@ def create_interest(
     lookback_days: int = Form(7),
     send_at: str = Form("08:30"),
     timezone: str = Form("Asia/Shanghai"),
+    cadence: str = Form("daily"),
+    cadence_days: int = Form(1),
     auto_optimize: str = Form("1"),
     send_now: str = Form(""),
     csrf: str = Form(""),
@@ -196,6 +217,13 @@ def create_interest(
             is_active=1,
             created_at=utc_iso(),
         )
+        # 频率：构造后归一化再赋值，避免非法值进库
+        from app.pipeline.digest import normalize_cadence
+
+        row.cadence, row.cadence_days = normalize_cadence(cadence, cadence_days)
+        # 立刻排期：否则要等到 build_digest 跑完才有 next_due_at，
+        # 而新订阅通常不会立刻发，队列就一直空转
+        row.next_due_at = _reschedule(row)
         session.add(row)
         session.commit()
         interest_id = int(row.id)
@@ -233,6 +261,7 @@ def view_interest(request: Request, interest_id: int):
         interest=row,
         profile=profile,
         revisions=revisions,
+        cadence_label=_cadence_label(row),
         csrf=csrf_for(request),
     )
 
@@ -359,6 +388,8 @@ def update_interest(
     lookback_days: int = Form(7),
     send_at: str = Form("08:30"),
     timezone: str = Form("Asia/Shanghai"),
+    cadence: str = Form("daily"),
+    cadence_days: int = Form(1),
     use_llm: str | None = Form(None),
     csrf: str = Form(""),
 ):
@@ -403,6 +434,11 @@ def update_interest(
             row.send_at = send_at.strip()
         if timezone.strip():
             row.timezone = timezone.strip()
+        row.cadence, row.cadence_days = _apply_cadence(
+            row, cadence, cadence_days
+        )
+        # 频率或时刻变了就要重排，否则改完设置要等一天才生效
+        row.next_due_at = _reschedule(row)
         session.add(row)
         session.commit()
 
@@ -430,6 +466,41 @@ def _split_kw(raw: str) -> list[str]:
         if p and p not in out:
             out.append(p)
     return out[:60]
+
+
+def _cadence_label(row: Interest) -> str:
+    """把频率设置渲染成人话，用于详情页与列表页。"""
+    from app.pipeline.digest import CADENCE_LABELS, normalize_cadence
+
+    mode, n = normalize_cadence(
+        getattr(row, "cadence", None), getattr(row, "cadence_days", 1)
+    )
+    if mode == "every_n_days":
+        return f"每 {n} 天" if n > 1 else CADENCE_LABELS[mode]
+    return CADENCE_LABELS.get(mode, "每天")
+
+
+def _apply_cadence(row: Interest, cadence: str, days: int) -> tuple[str, int]:
+    """校验频率设置并写回 interest。非法值回落到「每天」。"""
+    from app.pipeline.digest import normalize_cadence
+
+    mode, n = normalize_cadence(cadence, days)
+    row.cadence = mode
+    row.cadence_days = n
+    return mode, n
+
+
+def _reschedule(row: Interest) -> str | None:
+    """按当前频率重算下一次推送时间。"""
+    from app.pipeline.digest import compute_next_due
+
+    return compute_next_due(
+        row.send_at,
+        row.timezone,
+        cadence=getattr(row, "cadence", None) or "daily",
+        cadence_days=getattr(row, "cadence_days", 1) or 1,
+        last_sent_date=getattr(row, "last_sent_date", None),
+    )
 
 
 def _current_version(interest_id: int) -> int:

@@ -23,6 +23,16 @@ class Interest(Base):
     lookback_days: Mapped[int] = mapped_column(Integer, nullable=False, default=7)
     send_at: Mapped[str] = mapped_column(Text, nullable=False, default="08:30")
     timezone: Mapped[str] = mapped_column(Text, nullable=False, default="Asia/Shanghai")
+    # 推送频率：daily（每天）/ weekdays（工作日）/ every_n_days（隔 n 天）
+    cadence: Mapped[str] = mapped_column(
+        Text, nullable=False, default="daily", server_default="'daily'"
+    )
+    # cadence=every_n_days 时的间隔天数
+    cadence_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+    # 上次实际推送的本地日期，用来算隔天/每 n 天的间隔
+    last_sent_date: Mapped[str | None] = mapped_column(Text, nullable=True)
     auto_optimize: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     is_active: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

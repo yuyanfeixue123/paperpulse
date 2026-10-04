@@ -102,6 +102,7 @@
     </div>
 
     <div class="grid2">
+            {% include "subscribe/_cadence.html" %}
       <div class="field">
         <label>推送时间（本地时区）</label>
         <input type="text" name="send_at" value="08:30" placeholder="08:30">
@@ -129,6 +130,8 @@
 
   <button type="submit" onclick="syncQueries()">保存订阅</button>
 </form>
+
+<script src="{{ static('cadence-select.js') }}"></script>
 
 <script id="kw-presets" type="application/json">{{ keyword_presets | tojson }}</script>
 <script src="{{ static('interest-queries.js') }}"></script>

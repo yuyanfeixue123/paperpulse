@@ -19,6 +19,7 @@ from app.sources.crossref import find_by_title  # noqa: F401
 from app.sources.doaj import DoajSource
 from app.sources.europepmc import EuropePmcSource
 from app.sources.generic import ChemrxivSource, HalSource, ZenodoSource
+from app.sources.hf_papers import HuggingFacePapersSource
 from app.sources.openalex import OpenAlexSource
 from app.sources.osf import OsfSource
 from app.sources.pubmed import PubmedSource
@@ -38,6 +39,7 @@ ADAPTERS: dict[str, type[SourceBase]] = {
     "hal": HalSource,
     "chemrxiv": ChemrxivSource,
     "pubmed": PubmedSource,
+    "hf_papers": HuggingFacePapersSource,
 }
 
 

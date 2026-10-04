@@ -24,6 +24,52 @@ def restore_abstract(work: dict) -> str:
     return " ".join(pos[i] for i in sorted(pos))
 
 
+def collect_alternate_dois(work: dict) -> list[str]:
+    """收集同一作品的其它 DOI（预印本 ↔ 期刊正式版）。
+
+    bioRxiv 预印本与其期刊版 DOI 不同、标题常有微调，靠 `dedup_key_of`
+    的三个键（DOI / arXiv ID / 归一化标题）都判不出是同一篇 ——
+    用户会收到两次。OpenAlex 的 `locations` 里同一作品的每个版本各带一个
+    DOI，据此可建立等价关系。
+
+    只收 DOI 形态的标识：预印本→正式版的关联只能靠 DOI 走通。
+    主机名不校验（OpenAlex 数据可信），但会做基本形态过滤。
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def _add(raw: str | None) -> None:
+        if not raw:
+            return
+        d = str(raw).replace("https://doi.org/", "").strip().lower()
+        if d.startswith("10.") and d not in seen:
+            seen.add(d)
+            out.append(d)
+
+    _add(work.get("doi"))
+    for loc in work.get("locations") or []:
+        if isinstance(loc, dict):
+            _add(loc.get("doi"))
+    return out[:12]  # 防御：异常数据可能返回超长列表
+
+
+def canonical_doi_of(doi: str | None, alternates: list[str] | None) -> str:
+    """给一组等价 DOI 选一个「规范 DOI」，用作归并键。
+
+    优先用**正式出版物的 DOI** —— 特征是不含预印本前缀（10.1101 是
+    bioRxiv/medRxiv 的前缀）。预印本 DOI 通常排在前面，所以这里
+    显式挑一个非预印本的；都���预印本就退回第一个。
+    """
+    candidates = [d for d in ([doi] + list(alternates or [])) if d]
+    if not candidates:
+        return ""
+    preprint_prefixes = ("10.1101/", "10.21203/", "10.26434/")
+    for d in candidates:
+        if not d.lower().startswith(preprint_prefixes):
+            return d.lower()
+    return candidates[0].lower()
+
+
 class OpenAlexSource(SourceBase):
     def fetch(self, start_date: str, end_date: str, params: dict) -> Iterator[PaperItem]:
         contact = get_settings().sources.contact_email
@@ -81,6 +127,13 @@ class OpenAlexSource(SourceBase):
             doi=doi,
             arxiv_id=None,
             published_at=utc_iso(parse_iso(when)),
+            # 引文数：works API 默认返回，此前被直接丢弃。
+            # 用于「同分时优先推更有影响力的论文」，不并入主公式 ——
+            # 裸引文数有强时间偏置（新论文必然为 0），并入会压制新作。
+            cited_by_count=int(work.get("cited_by_count") or 0),
+            # 关联同一作品的其它 DOI：预印本与期刊正式版互指，
+            # 据此把两者归并为同一篇，避免用户收到两次。
+            alternate_dois=collect_alternate_dois(work),
         )
 
     def healthcheck(self) -> tuple[bool, str]:

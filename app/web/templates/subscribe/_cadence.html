@@ -1,0 +1,19 @@
+{# 邮件推送频率选择。三个页面共用，故抽成片段。
+
+   cadence / cadence_days 缺省时从 interest 对象取（编辑页、详情页），
+   都没有则回落到「每天」。调用方若要强制默认值，先 set 再 include。 #}
+{% set _cad = cadence if cadence is defined else (interest.cadence if interest is defined and interest.cadence else 'daily') %}
+{% set _days = cadence_days if cadence_days is defined else (interest.cadence_days if interest is defined and interest.cadence_days else 1) %}
+<div class="field">
+  <label>推送频率</label>
+  <select name="cadence" data-cadence-select>
+    <option value="daily" {% if _cad != 'weekdays' and _cad != 'every_n_days' %}selected{% endif %}>每天</option>
+    <option value="weekdays" {% if _cad == 'weekdays' %}selected{% endif %}>工作日（周一至周五）</option>
+    <option value="every_n_days" {% if _cad == 'every_n_days' %}selected{% endif %}>自定义间隔</option>
+  </select>
+</div>
+<div class="field" data-cadence-days {% if _cad != 'every_n_days' %}hidden{% endif %}>
+  <label>间隔天数（1–30）</label>
+  <input type="number" name="cadence_days" min="1" max="30" value="{{ _days or 1 }}">
+  <p class="small muted">填 7 即每周。省下的邮件额度可以留给别的订阅。</p>
+</div>

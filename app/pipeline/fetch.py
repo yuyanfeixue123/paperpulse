@@ -64,26 +64,65 @@ def build_fetch_jobs() -> int:
 
 
 def upsert_paper(item: PaperItem) -> tuple[int, bool]:
-    """写入或更新论文，返回 (paper_id, 是否新增)。"""
+    """写入或更新论文，返回 (paper_id, 是否新增)。
+
+    去重分三层，逐层放宽：
+      1. `dedup_key_of`（DOI / arXiv ID / 归一化标题）—— 原有逻辑
+      2. **规范 DOI 相同** —— 预印本与其期刊正式版。这是新增的一层：
+         bioRxiv 预印本 DOI 是 `10.1101/xxx`、期刊版是 `10.1038/yyy`，
+         标题也常有微调，三键都判不出是同一篇，用户会收到两次。
+         OpenAlex 的 `locations` 给出两者的互指关系。
+      3. 落库时把 `alternate_dois` 一起记下，供后续批次匹配
+    """
+    from app.sources.openalex import canonical_doi_of
+
     key = dedup_key_of(item.doi, item.arxiv_id, item.title)
+    canon = canonical_doi_of(item.doi, item.alternate_dois)
     now = utc_iso()
     with SessionLocal() as session:
         row = session.query(Paper).filter(Paper.dedup_key == key).first()
+        # 第二层：按「等价 DOI 集合」找已存在的同一作品。
+        #
+        # 不能只比 canonical_doi：预印本入库时它的等价集合里只有自己
+        # （10.1101/xxx），而期刊版的集合是 {10.1101/xxx, 10.1038/yyy}，
+        # 两个 canonical 值不相等，永远匹配不上。必须检查
+        # 「是否有任一等价 DOI 出现在已有行的等价集合里」。
+        if row is None and canon:
+            equivalents = {canon}
+            equivalents.update(d for d in (item.alternate_dois or []) if d)
+            if item.doi:
+                equivalents.add(item.doi.strip().lower())
+            # canonical_doi 命中，或 alternate_dois_json 里有交集
+            for hit in session.query(Paper).filter(
+                Paper.canonical_doi.in_(sorted(equivalents))
+            ).all():
+                row = hit
+                break
+            if row is None:
+                # alternate_dois_json 是 JSON 文本数组，用 LIKE 做包含判断。
+                # 不能全表扫：论文池上万行，每条新论文都扫一遍会成 O(n²)。
+                from sqlalchemy import or_ as _or
+
+                conds = [
+                    Paper.alternate_dois_json.like(f"%{d}%") for d in sorted(equivalents)
+                ]
+                conds.append(Paper.doi.in_(sorted(equivalents)))
+                conds.append(Paper.arxiv_id.in_(sorted(equivalents)))
+                row = (
+                    session.query(Paper)
+                    .filter(_or(*conds))
+                    .order_by(Paper.id.desc())
+                    .first()
+                )
+            if row is not None:
+                log.info(
+                    "fetch.dedup_by_canonical",
+                    canon=canon,
+                    kept=int(row.id),
+                    incoming=item.title[:60],
+                )
         if row is not None:
-            changed = False
-            if item.abstract and len(item.abstract) > len(row.abstract or ""):
-                row.abstract = item.abstract
-                row.abstract_quality = item.abstract_quality
-                changed = True
-            if item.venue and not row.venue:
-                row.venue = item.venue
-                changed = True
-            if item.url and not row.url:
-                row.url = item.url
-                changed = True
-            if item.doi and not row.doi:
-                row.doi = item.doi.lower()
-                changed = True
+            changed = _merge_into(session, row, item, canon)
             if changed:
                 session.commit()
             return int(row.id), False
@@ -101,10 +140,68 @@ def upsert_paper(item: PaperItem) -> tuple[int, bool]:
             url=item.url,
             published_at=item.published_at,
             first_seen_at=now,
+            cited_by_count=max(0, int(item.cited_by_count)),
+            canonical_doi=canon or None,
+            alternate_dois_json=dumps(item.alternate_dois or []),
+            github_repo=item.github_repo or "",
+            github_stars=max(0, int(item.github_stars)),
+            upvotes=max(0, int(item.upvotes)),
         )
         session.add(row)
         session.commit()
         return int(row.id), True
+
+
+def _merge_into(
+    session, row: Paper, item: PaperItem, canon: str
+) -> bool:
+    """把新采集到的信息并入已有行。返回是否发生变更。
+
+    规则：只在「原来没有」或「新的明显更好」时覆盖，避免后到的劣质数据
+    冲掉先到的完整数据。
+    """
+    changed = False
+    if item.abstract and len(item.abstract) > len(row.abstract or ""):
+        row.abstract = item.abstract
+        row.abstract_quality = item.abstract_quality
+        changed = True
+    if item.venue and not row.venue:
+        row.venue = item.venue
+        changed = True
+    if item.url and not row.url:
+        row.url = item.url
+        changed = True
+    if item.doi and not row.doi:
+        row.doi = item.doi.lower()
+        changed = True
+    # 引文数：只增不减（取最大值）。-1 表示未知，不能覆盖已知值。
+    incoming_cites = int(item.cited_by_count)
+    if incoming_cites > int(row.cited_by_count):
+        row.cited_by_count = incoming_cites
+        changed = True
+    # 代码仓库与热度同理
+    if item.github_repo and not row.github_repo:
+        row.github_repo = item.github_repo
+        changed = True
+    if int(item.github_stars) > int(row.github_stars):
+        row.github_stars = int(item.github_stars)
+        changed = True
+    if int(item.upvotes) > int(row.upvotes):
+        row.upvotes = int(item.upvotes)
+        changed = True
+    # 合并等价 DOI：让后续批次无论用预印本还是正式版的 DOI 都能命中
+    if canon and not row.canonical_doi:
+        row.canonical_doi = canon
+        changed = True
+    alts = set(json.loads(row.alternate_dois_json or "[]"))
+    before = len(alts)
+    alts.update(d for d in (item.alternate_dois or []) if d)
+    if item.doi:
+        alts.add(item.doi.lower())
+    if len(alts) != before:
+        row.alternate_dois_json = dumps(sorted(alts))
+        changed = True
+    return changed
 
 
 def run_fetch_job(job: FetchJob) -> int:

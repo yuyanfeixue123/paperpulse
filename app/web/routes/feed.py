@@ -39,7 +39,8 @@ def _rows_for(digest_id: int) -> list[dict]:
         rows = s.execute(
             sql(
                 "SELECT p.id, p.title, p.abstract, p.authors_json, p.venue, "
-                "       p.published_at, p.url, p.doi, "
+                "       p.published_at, p.url, p.doi, p.arxiv_id, "
+                "       p.cited_by_count, p.github_repo, p.github_stars, p.upvotes, "
                 "       di.llm_score, di.final_score, di.reason, di.position "
                 "FROM digest_items di JOIN papers p ON p.id = di.paper_id "
                 "WHERE di.digest_id = :d ORDER BY di.position"
@@ -58,10 +59,15 @@ def _rows_for(digest_id: int) -> list[dict]:
                 "published_at": (r[5] or "")[:10],
                 "url": r[6] or "",
                 "doi": r[7] or "",
-                "llm_score": int(r[8]),
-                "final_score": round(float(r[9]), 3),
-                "reason": r[10] or "",
-                "stars": "★" * int(r[8]) + "☆" * (5 - int(r[8])),
+                "arxiv_id": r[8] or "",
+                "cited_by": max(0, int(r[9])) if r[9] is not None else 0,
+                "github_repo": r[10] or "",
+                "github_stars": int(r[11] or 0),
+                "upvotes": int(r[12] or 0),
+                "llm_score": int(r[13]),
+                "final_score": round(float(r[14]), 3),
+                "reason": r[15] or "",
+                "stars": "★" * int(r[13]) + "☆" * (5 - int(r[13])),
             }
         )
     return out
@@ -421,7 +427,8 @@ def _stream_rows(user_id: int, size: int, offset: int) -> tuple[int, list[dict]]
             sql(
                 """
                 SELECT p.id, p.title, p.abstract, p.authors_json, p.venue,
-                       p.published_at, p.url, p.doi,
+                       p.published_at, p.url, p.doi, p.arxiv_id,
+                       p.cited_by_count, p.github_repo, p.github_stars, p.upvotes,
                        MAX(ls.score)                  AS best_score,
                        COUNT(DISTINCT ls.interest_id) AS hit_count,
                        MAX(ls.interest_id)            AS primary_interest
@@ -472,13 +479,18 @@ def _stream_rows(user_id: int, size: int, offset: int) -> tuple[int, list[dict]]
                 "published_at": (r[5] or "")[:10],
                 "url": r[6] or "",
                 "doi": r[7] or "",
-                "llm_score": int(r[8]),
-                "stars": "★" * int(r[8]) + "☆" * (5 - int(r[8])),
+                "arxiv_id": r[8] or "",
+                "cited_by": max(0, int(r[9])) if r[9] is not None else 0,
+                "github_repo": r[10] or "",
+                "github_stars": int(r[11] or 0),
+                "upvotes": int(r[12] or 0),
+                "llm_score": int(r[13]),
+                "stars": "★" * int(r[13]) + "☆" * (5 - int(r[13])),
                 # 完整订阅名列表（不做逗号切分，订阅名本身可能含逗号）
                 "interest_names": [n for n in hits.get(pid, []) if n],
-                "hit_count": int(r[9]),
+                "hit_count": int(r[14]),
                 # 评价要落到具体订阅上：取分数最高的那一个
-                "interest_id": int(r[10]) if r[10] else 0,
+                "interest_id": int(r[15]) if r[15] else 0,
             }
         )
     return total, items

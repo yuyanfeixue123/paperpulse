@@ -110,7 +110,8 @@ def load_papers(ids: list[int]) -> list[dict[str, Any]]:
         rows = session.execute(
             sql(
                 f"SELECT id, title, abstract, venue, published_at, url, doi, authors_json, "
-                f"abstract_quality FROM papers WHERE id IN ({placeholders})"
+                f"abstract_quality, cited_by_count, arxiv_id, github_repo, upvotes "
+                f"FROM papers WHERE id IN ({placeholders})"
             )
         ).all()
     by_id = {
@@ -124,6 +125,11 @@ def load_papers(ids: list[int]) -> list[dict[str, Any]]:
             "doi": r[6],
             "authors": json.loads(r[7] or "[]"),
             "abstract_quality": r[8],
+            # 引文数与外链字段：rank 用它做 tie-breaker，模板用它渲染徽标
+            "cited_by_count": int(r[9]) if r[9] is not None else -1,
+            "arxiv_id": r[10] or "",
+            "github_repo": r[11] or "",
+            "upvotes": int(r[12] or 0),
         }
         for r in rows
     }

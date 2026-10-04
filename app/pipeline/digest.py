@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date as _date
 from datetime import timedelta
 from typing import Any
 
@@ -18,17 +19,96 @@ from app.models.system import SystemSettings
 log = get_logger(__name__)
 
 
-def compute_next_due(send_at: str, tz: str, now: Any = None) -> str:
-    """按用户本地时区算出下一次推送的 UTC 时刻。"""
+CADENCE_DAILY = "daily"
+CADENCE_WEEKDAYS = "weekdays"
+CADENCE_EVERY_N = "every_n_days"
+CADENCE_CHOICES = (CADENCE_DAILY, CADENCE_WEEKDAYS, CADENCE_EVERY_N)
+# 间隔模式下的最大前推步数。200 × 最短间隔 2 天 ≈ 400 天，足够越过
+# 任何合理的「上次推送」历史值，又保证不会死循环。
+_MAX_CADENCE_STEPS = 200
+CADENCE_LABELS = {
+    CADENCE_DAILY: "每天",
+    CADENCE_WEEKDAYS: "工作日（周一至周五）",
+    CADENCE_EVERY_N: "自定义间隔",
+}
+
+
+def normalize_cadence(cadence: str | None, days: int | None) -> tuple[str, int]:
+    """校验并归一化频率设置。非法值回落到「每天」。"""
+    mode = (cadence or CADENCE_DAILY).strip()
+    if mode not in CADENCE_CHOICES:
+        mode = CADENCE_DAILY
+    try:
+        n = int(days or 1)
+    except (TypeError, ValueError):
+        n = 1
+    # 间隔上限 30 天：再长用「每两周」表达即可，跨度太大没有实际意义
+    n = max(1, min(30, n))
+    if mode == CADENCE_DAILY:
+        n = 1
+    return mode, n
+
+
+def compute_next_due(
+    send_at: str,
+    tz: str,
+    now: Any = None,
+    cadence: str = CADENCE_DAILY,
+    cadence_days: int = 1,
+    last_sent_date: str | None = None,
+) -> str:
+    """按用户本地时区与推送频率算出下一次推送的 UTC 时刻。
+
+    三种频率：
+      - daily        每天
+      - weekdays     周一至周五（跳过周末）
+      - every_n_days 距上次推送满 n 天（n 从 1 起；n=7 即每���周）
+
+    `last_sent_date` 是上次实际推送的**本地日期**（YYYY-MM-DD）。
+    缺它时退化为「按自然日对齐」——即每隔 n 天的固定日期，
+    避免首次排期就因为没有历史而永远不触发。
+    """
     now = now or now_utc()
     local = now.astimezone(zone(tz))
     try:
         h, m = (int(x) for x in send_at.split(":"))
     except ValueError:
         h, m = 8, 30
+    mode, n = normalize_cadence(cadence, cadence_days)
+
     nxt = local.replace(hour=h, minute=m, second=0, microsecond=0)
     if nxt <= local:
         nxt += timedelta(days=1)
+
+    if mode == CADENCE_WEEKDAYS:
+        # 最多往后找 7 天 —— 连续 7 天都是工作日是不可能的
+        for _ in range(7):
+            if nxt.weekday() < 5:  # 0=周一 .. 4=周五
+                break
+            nxt += timedelta(days=1)
+        return nxt.astimezone(zone("UTC")).isoformat(timespec="seconds")
+
+    if mode == CADENCE_EVERY_N and n > 1:
+        if last_sent_date:
+            try:
+                last = _date.fromisoformat(last_sent_date)
+                # 语义：「距上次推送满 n 天」。从上次那天起按 n 天步进，
+                # 取第一个尚未到达的时刻。
+                #
+                # 不能写成「cand = last + n，若已过就 cand += n」——
+                # 那样只在两次步进之间对齐，n=3、上次 1-01、now 1-08 时
+                # 会算出 1-04 已过 -> 1-07，而 1-07 距上次是 6 天不是 3 天。
+                cand = nxt.replace(
+                    year=last.year, month=last.month, day=last.day
+                )
+                for _ in range(_MAX_CADENCE_STEPS):
+                    if cand > local:
+                        break
+                    cand = cand + timedelta(days=n)
+                nxt = cand
+            except ValueError:
+                pass  # 历史值不可解析时按自然日顺延
+
     return nxt.astimezone(zone("UTC")).isoformat(timespec="seconds")
 
 
@@ -203,7 +283,18 @@ def build_digest(interest_id: int, date: str = "", rebuild: bool = False) -> int
 
     with SessionLocal() as session:
         interest = session.get(Interest, interest_id)
-        interest.next_due_at = compute_next_due(interest.send_at, interest.timezone)
+        # 先按「还没发过」算下一次，再用本次日期作为新的锚点 ——
+        # 顺序不能反：若先把 last_sent_date 写成今天再算，间隔会从今天起算，
+        # 隔天模式会永远等不到「满 n 天」。
+        next_at = compute_next_due(
+            interest.send_at,
+            interest.timezone,
+            cadence=getattr(interest, "cadence", None) or CADENCE_DAILY,
+            cadence_days=getattr(interest, "cadence_days", 1) or 1,
+            last_sent_date=getattr(interest, "last_sent_date", None),
+        )
+        interest.next_due_at = next_at
+        interest.last_sent_date = today_local(interest.timezone)
         session.commit()
 
     log.info(

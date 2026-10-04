@@ -29,6 +29,7 @@
     <tr><th>每日篇数</th><td>{{ interest.max_papers_per_day }}</td></tr>
     <tr><th>最低分</th><td>{{ interest.min_score }}</td></tr>
     <tr><th>回看天数</th><td>{{ interest.lookback_days }}</td></tr>
+    <tr><th>推送频率</th><td>{{ cadence_label }}</td></tr>
     <tr><th>推送时间</th><td>{{ interest.send_at }}（{{ interest.timezone }}）</td></tr>
     <tr><th>下次推送</th><td>{{ interest.next_due_at or '未排期' }}</td></tr>
     <tr><th>上次修订</th><td>{{ interest.last_revised_at or '—' }}</td></tr>

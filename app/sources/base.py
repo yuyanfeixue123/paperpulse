@@ -24,6 +24,16 @@ class PaperItem:
     arxiv_id: str | None = None
     published_at: str = field(default_factory=utc_iso)
     abstract_quality: str = "full"
+    # 引文数。-1 表示未知 —— 0（查过、无人引）与「没查过」必须可区分，
+    # 否则排序时会把「没数据」当成「没人引」。
+    cited_by_count: int = -1
+    # 代码仓库（HF Daily Papers 的 githubRepo 字段，作者自填）
+    github_repo: str = ""
+    github_stars: int = 0
+    # 社区热度（HF Daily Papers 的 upvotes）
+    upvotes: int = 0
+    # 同一作品的其它标识（预印本 ↔ 正式版），用于归并去重
+    alternate_dois: list[str] = field(default_factory=list)
 
 
 class SourceBase:

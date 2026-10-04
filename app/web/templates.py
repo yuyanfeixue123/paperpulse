@@ -99,3 +99,25 @@ def apply_security_headers(resp: Response, request: Request | None = None) -> No
 def render_string(name: str, **ctx: object) -> str:
     """供邮件渲染使用（无 request）。"""
     return _env.get_template(name).render(**ctx)
+
+
+def _b64paper(value: object) -> str:
+    """把论文字典编码成 base64，供前端 JS 还原。
+
+    为什么不用 `| tojson` 直接放进 HTML 属性：Jinja 的 tojson 会把
+    内部引号转义成 `\\"`，而 HTML 属性里那个反斜杠**不会**被 HTML 解析器
+    识别 —— 结果属性在第一个引号处就被截断，JSON 残缺、JS 直接抛错。
+    标题里带引号（论文标题里很常见）就会触发。
+    base64 只含 [A-Za-z0-9+/=]，对属性与 CSP 都安全。
+    """
+    import base64
+    import json as _json
+
+    try:
+        raw = _json.dumps(value, ensure_ascii=False).encode("utf-8")
+    except (TypeError, ValueError):
+        return ""
+    return base64.b64encode(raw).decode("ascii")
+
+
+_env.filters["b64paper"] = _b64paper
