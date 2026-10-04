@@ -162,14 +162,24 @@ class PubmedSource(SourceBase):
 
 
 def _pub_date(art: ET.Element) -> str:
-    """PubDate 可能是 Year/Month/Day，也可能是 MedlineDate（'2024 Jun 23'）。"""
+    """PubDate 有三种实测形态：
+
+    - ``<Year>2026</Year><Month>02</Month><Day>26</Day>``（数字）
+    - ``<Year>2026</Year><Month>Feb</Month><Day>26</Day>``（**英文缩写，实测更常见**）
+    - ``<MedlineDate>2024 Jun 23</MedlineDate>``（无年月日子节点）
+
+    月份缩写必须规整，否则会拼出 ``2026-Feb-26`` 这种非法 ISO，
+    导致按 published_at 的时间窗过滤与排序全部失效。
+    """
     node = art.find(".//Journal/JournalIssue/PubDate")
     if node is not None:
         year = _text(node.find("Year"))
-        month = _text(node.find("Month"))
-        day = _text(node.find("Day"))
-        if year.isdigit():
-            return f"{year}-{month or '01'}-{day or '01'}T00:00:00+00:00"
+        if year.isdigit() and len(year) == 4:
+            month = _month_num(_text(node.find("Month")))
+            day = _text(node.find("Day"))
+            # Day 可能是 "0"（占位）或缺失，回落到 1
+            day_num = int(day) if day.isdigit() and 1 <= int(day) <= 31 else 1
+            return f"{year}-{month:02d}-{day_num:02d}T00:00:00+00:00"
         medline = _text(node.find("MedlineDate"))
         if medline:
             return _parse_medline_date(medline)
@@ -179,7 +189,18 @@ def _pub_date(art: ET.Element) -> str:
 _MONTHS = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
     "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    # 拉丁文常见变体
+    "sept": 9,
 }
+
+
+def _month_num(raw: str) -> int:
+    """把月份规整为 1–12。接受 '2' / '02' / 'Feb' / 'February'。"""
+    text = (raw or "").strip()
+    if text.isdigit():
+        value = int(text)
+        return value if 1 <= value <= 12 else 1
+    return _MONTHS.get(text.lower()[:3], 1)
 
 
 def _parse_medline_date(raw: str) -> str:
@@ -188,5 +209,4 @@ def _parse_medline_date(raw: str) -> str:
     if not m:
         return utc_iso()
     year, mon = m.group(1), m.group(2)
-    month = _MONTHS.get((mon or "").lower()[:3], 1)
-    return f"{year}-{month:02d}-01T00:00:00+00:00"
+    return f"{year}-{_month_num(mon or ''):02d}-01T00:00:00+00:00"

@@ -241,3 +241,44 @@ def test_pubmed_tolerates_broken_xml():
 
     assert list(PubmedSource({"key": "pubmed"})._parse("<not-xml")) == []
     assert list(PubmedSource({"key": "pubmed"})._parse("<a/>")) == []
+
+
+def test_pubmed_month_abbreviation_is_normalized():
+    """回归：NCBI 实际返回 <Month>Feb</Month>，直接拼接会产出
+    '2026-Feb-26' 这种非法 ISO，使按 published_at 的时间窗过滤与排序全部失效。"""
+    from xml.etree import ElementTree as ET
+
+    from app.sources.pubmed import PubmedSource, _month_num
+
+    assert _month_num("Feb") == 2
+    assert _month_num("02") == 2
+    assert _month_num("2") == 2
+    assert _month_num("SEPT") == 9
+    assert _month_num("") == 1
+    assert _month_num("garbage") == 1
+
+    xml = (
+        "<PubmedArticleSet><PubmedArticle><MedlineCitation><PMID>1</PMID><Article>"
+        "<Journal><JournalIssue><PubDate><Year>2026</Year><Month>Feb</Month>"
+        "<Day>26</Day></PubDate></JournalIssue><Title>J</Title></Journal>"
+        "<ArticleTitle>T</ArticleTitle></Article></MedlineCitation>"
+        "</PubmedArticle></PubmedArticleSet>"
+    )
+    art = ET.fromstring(xml).find(".//Article")
+    item = list(PubmedSource({"key": "pubmed"})._parse(xml))[0]
+    assert item.published_at == "2026-02-26T00:00:00+00:00"
+    assert art is not None
+
+
+def test_pubmed_zero_day_falls_back_to_first():
+    from app.sources.pubmed import PubmedSource
+
+    xml = (
+        "<PubmedArticleSet><PubmedArticle><MedlineCitation><PMID>1</PMID><Article>"
+        "<Journal><JournalIssue><PubDate><Year>2026</Year><Month>Oct</Month>"
+        "<Day>0</Day></PubDate></JournalIssue><Title>J</Title></Journal>"
+        "<ArticleTitle>T</ArticleTitle></Article></MedlineCitation>"
+        "</PubmedArticle></PubmedArticleSet>"
+    )
+    item = list(PubmedSource({"key": "pubmed"})._parse(xml))[0]
+    assert item.published_at == "2026-10-01T00:00:00+00:00"
